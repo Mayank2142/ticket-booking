@@ -313,17 +313,6 @@ Railway currently mounts relative application data under `/app`, does not expose
 
 SQLite is intentionally retained for a dependency-light assessment deployment with one application instance and a persistent volume. It provides transactional correctness but serialises writes and is not appropriate for horizontal scaling or sustained high-demand traffic. A production evolution should use PostgreSQL, Prisma’s PostgreSQL datasource, row-level locking/serializable transactions, and a durable job queue for email and expiry work.
 
-## Submission checklist
-
-- [x] Public GitHub repository on `main`
-- [x] Complete source without dependencies, build output, `.env`, or local databases
-- [x] Setup guide, environment template, API reference, schema explanation
-- [x] Seat hold, concurrency, waitlist, QR, and email implementation
-- [x] System design write-up under 800 words
-- [x] Automated concurrency and lifecycle tests
-- [x] Real application screenshots
-- [ ] Railway public URL — requires project-owner account access
-- [ ] Verified production SMTP delivery — requires provider credentials
 
 ---
 
