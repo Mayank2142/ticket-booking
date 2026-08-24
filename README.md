@@ -14,7 +14,7 @@
 
 Premium event discovery · visual seat selection · expiring holds · fair waitlist offers · QR email tickets
 
-[Preview](#product-preview) · [Features](#features) · [Design](#how-the-hard-parts-work) · [Setup](#local-setup) · [API](#api-reference) · [Deploy](#railway-deployment)
+[Live demo](https://ticket-booking-production-9e71.up.railway.app) · [Preview](#product-preview) · [Features](#features) · [Design](#how-the-hard-parts-work) · [Setup](#local-setup) · [API](#api-reference) · [Deploy](#railway-deployment)
 
 </div>
 
@@ -293,18 +293,24 @@ The complete source of truth is [prisma/schema.prisma](prisma/schema.prisma).
 
 ## Railway deployment
 
-The repository is Railway-ready, but a live URL cannot be created without access to the owner’s Railway account and SMTP credentials. After deployment, add the generated domain here:
+> **Live application:** https://ticket-booking-production-9e71.up.railway.app
 
-> **Live application:** not published yet
+| Production component | Status |
+|---|---|
+| Web application | Deployed from public GitHub `main` |
+| Database | SQLite on a persistent `/app/data` Railway volume; migrations and seed verified |
+| Health check | `/api/health` returns `status: ok` and `database: connected` |
+| Hold/offer cleanup | Dedicated `cleanup-cron` service runs every five minutes using `railway.cron.json` |
+| SMTP delivery | Requires verified provider credentials before production ticket email can be marked ready |
 
-Recommended SQLite demo deployment:
+The deployed SQLite assessment architecture is reproduced as follows:
 
 1. Create a Railway project from the public GitHub `main` branch.
 2. Attach a volume at `/app/data` and set `DATABASE_URL=file:/app/data/ticket-booking.db`. Railway mounts volumes only at runtime, so `railway.json` applies migrations in the start command.
 3. Add all required variables from `.env.example`; use strong unique values for `JWT_SECRET` and `CRON_SECRET`.
 4. Generate a public domain, set `APP_URL` to that exact HTTPS origin, and redeploy.
 5. Keep the configured health check at `/api/health`.
-6. Create a second Railway service from the same repo, override its start command to `npm run cron:cleanup`, copy `APP_URL` and `CRON_SECRET`, and schedule it for `*/5 * * * *`. It only calls the web API and does not need the SQLite volume.
+6. Create a second Railway service from the same repo, select `railway.cron.json` as its config file, copy `APP_URL` and `CRON_SECRET`, and schedule it for `*/5 * * * *`. It only calls the web API and does not need the SQLite volume.
 7. Configure SMTP, run `npm run email:verify` through the production environment, then make a real booking and waitlist cancellation.
 
 Railway currently mounts relative application data under `/app`, does not expose volumes during build/pre-deploy, and supports a minimum cron interval of five minutes. Seat-map reads also enforce expiry, so visible stale holds do not wait for cron. See the official [volume](https://docs.railway.com/volumes), [cron](https://docs.railway.com/cron-jobs), and [health-check](https://docs.railway.com/deployments/healthchecks) documentation.
