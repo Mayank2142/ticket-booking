@@ -4,7 +4,7 @@
 
 ### Fair, concurrency-safe ticket booking for movies and concerts
 
-<img src="public/images/cinema-hero.png" alt="CineBook cinematic booking experience" width="900" />
+<img src="public/images/Screenshot 2026-08-24 233531.png" alt="CineBook cinematic booking experience" width="900" />
 
 [![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=nextdotjs)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
