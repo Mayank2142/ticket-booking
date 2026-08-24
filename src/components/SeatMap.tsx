@@ -1,5 +1,7 @@
 "use client";
 
+import { displaySeatLabel } from "@/lib/presentation";
+
 type SeatCell = {
   seatId: string;
   label: string;
@@ -23,55 +25,62 @@ export function SeatMap({
   selected: string[];
   onToggle: (seatId: string, status: string) => void;
 }) {
-  const grid = Array.from({ length: rows }, (_, r) =>
-    Array.from({ length: cols }, (_, c) =>
-      seats.find((s) => s.row === r + 1 && s.col === c + 1)
-    )
+  const grid = Array.from({ length: rows }, (_, row) =>
+    Array.from({ length: cols }, (_, col) => seats.find((seat) => seat.row === row + 1 && seat.col === col + 1))
   );
 
-  function seatStyle(seat: SeatCell, isSelected: boolean) {
-    if (isSelected) return { background: "#ffffff", color: "#0f0f0f" };
-    if (seat.status === "BOOKED") return { background: "#1a1a1a", color: "rgba(255,255,255,0.3)" };
-    if (seat.status === "HELD") return { background: "#3f3f3f", color: "#ffffff", outline: "1px dashed rgba(255,255,255,0.4)" };
-    return { background: "#272727", color: "#ffffff" };
-  }
-
   return (
-    <div className="card space-y-4 p-5">
-      <div className="rounded-full bg-[#1a1a1a] px-4 py-2 text-center text-xs text-white/50">SCREEN</div>
-      <div className="overflow-x-auto">
-        <div className="inline-grid gap-1.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
-          {grid.flat().map((seat, i) => {
-            if (!seat) return <div key={i} className="h-8 w-8" />;
-            const isSelected = selected.includes(seat.seatId);
-            const disabled = seat.status === "BOOKED" || (seat.status === "HELD" && !seat.heldByMe);
-            const style = seatStyle(seat, isSelected);
-
-            return (
-              <button
-                key={seat.seatId}
-                title={`${seat.label} · ${seat.category.name}`}
-                disabled={disabled}
-                onClick={() => onToggle(seat.seatId, seat.status)}
-                className="h-8 w-8 rounded-md text-[9px] font-medium disabled:cursor-not-allowed"
-                style={{
-                  ...style,
-                  opacity: disabled && !isSelected ? 0.5 : 1,
-                  boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)",
-                }}
-              >
-                {seat.label}
-              </button>
-            );
-          })}
+    <div className="card overflow-hidden p-4 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-10 text-center">
+          <div className="mx-auto h-7 w-[85%] rounded-[50%] border-t-4 border-emerald-300/80 shadow-[0_-10px_30px_rgba(52,211,153,.35)]" />
+          <p className="-mt-1 text-[10px] font-semibold uppercase tracking-[0.35em] text-emerald-200/55">Screen this way</p>
         </div>
-      </div>
-      <div className="flex flex-wrap gap-4 text-xs muted">
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-[#272727]" /> Available</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded border border-dashed border-white/40 bg-[#3f3f3f]" /> Held</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-[#1a1a1a]" /> Booked</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-3 w-3 rounded bg-white" /> Selected</span>
+
+        <div className="overflow-x-auto pb-3">
+          <div className="mx-auto w-max space-y-2">
+            {grid.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex items-center gap-2">
+                <span className="w-5 text-center text-[10px] font-semibold text-white/30">{displaySeatLabel(rowIndex + 1, 1).replace(/\d+$/, "")}</span>
+                <div className="flex gap-1.5 sm:gap-2">
+                  {row.map((seat, colIndex) => {
+                    if (!seat) return <span key={colIndex} className="h-7 w-7 sm:h-8 sm:w-8" />;
+                    const isSelected = selected.includes(seat.seatId);
+                    const disabled = seat.status === "BOOKED" || (seat.status === "HELD" && !seat.heldByMe);
+                    const state = isSelected ? "selected" : seat.status.toLowerCase();
+                    const aisle = cols >= 6 && colIndex === Math.floor(cols / 2) - 1;
+                    return (
+                      <button
+                        key={seat.seatId}
+                        type="button"
+                        title={`${displaySeatLabel(seat.row, seat.col)} · ${seat.category.name} · ${state}`}
+                        aria-label={`${displaySeatLabel(seat.row, seat.col)}, ${seat.category.name}, ${state}`}
+                        aria-pressed={isSelected}
+                        disabled={disabled}
+                        onClick={() => onToggle(seat.seatId, seat.status)}
+                        className={`cinema-seat cinema-seat-${state} ${aisle ? "mr-4 sm:mr-6" : ""}`}
+                      >
+                        {displaySeatLabel(seat.row, seat.col)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8 flex flex-wrap justify-center gap-x-5 gap-y-3 text-[11px] text-white/50">
+          <Legend className="cinema-seat-available" label="Available" />
+          <Legend className="cinema-seat-selected" label="Selected" />
+          <Legend className="cinema-seat-held" label="Held" />
+          <Legend className="cinema-seat-booked" label="Booked" />
+        </div>
       </div>
     </div>
   );
+}
+
+function Legend({ className, label }: { className: string; label: string }) {
+  return <span className="flex items-center gap-2"><span className={`h-3.5 w-4 rounded-[4px] border ${className}`} />{label}</span>;
 }

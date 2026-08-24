@@ -1,4 +1,11 @@
 const TOKEN_KEY = "token";
+export const AUTH_CHANGED_EVENT = "cinebook:auth-changed";
+
+function announceAuthChange() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_CHANGED_EVENT));
+  }
+}
 
 export function getToken() {
   if (typeof window === "undefined") return null;
@@ -7,10 +14,12 @@ export function getToken() {
 
 export function setToken(token: string) {
   localStorage.setItem(TOKEN_KEY, token);
+  announceAuthChange();
 }
 
 export function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
+  announceAuthChange();
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {

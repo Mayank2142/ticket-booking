@@ -3,6 +3,7 @@ import { EventType, Role } from "@/generated/prisma/client";
 import { err, ok } from "@/lib/api";
 import { getUser, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { validateEventInput, ValidationError } from "@/lib/validation";
 
 export async function GET(req: NextRequest) {
   const user = await getUser(req);
@@ -33,26 +34,27 @@ export async function POST(req: NextRequest) {
   const user = await getUser(req);
   if (!requireRole(user, [Role.ORGANISER, Role.ADMIN])) return err("Forbidden", 403);
 
-  const body = await req.json();
-  const { title, type, description, venueId, date, time, prices } = body as {
-    title?: string;
-    type?: EventType;
-    description?: string;
-    venueId?: string;
-    date?: string;
-    time?: string;
-    prices?: { categoryId: string; price: number }[];
-  };
-
-  if (!title || !type || !venueId || !date || !time || !prices?.length) {
-    return err("Missing fields");
+  let input;
+  try {
+    input = validateEventInput(await req.json());
+  } catch (error) {
+    return err(error instanceof ValidationError ? error.message : "Invalid event data");
   }
+
+  const { title, type, description, venueId, date, time, prices } = input;
 
   const venue = await db.venue.findUnique({
     where: { id: venueId },
     include: { seats: true, categories: true },
   });
   if (!venue) return err("Venue not found", 404);
+  const venueCategoryIds = new Set(venue.categories.map((category) => category.id));
+  if (
+    prices.length !== venue.categories.length ||
+    prices.some((price) => !venueCategoryIds.has(price.categoryId))
+  ) {
+    return err("Provide exactly one price for every category in the selected venue");
+  }
 
   const event = await db.$transaction(async (tx) => {
     const created = await tx.event.create({

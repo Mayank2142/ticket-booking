@@ -1,18 +1,20 @@
 import type { Metadata } from "next";
 import { Nav } from "@/components/Nav";
+import { Footer } from "@/components/Footer";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Ticket Booking System",
-  description: "Book movie and concert tickets",
+  title: "CineBook — Movies & Live Events",
+  description: "Discover movies and concerts, choose your seats, and get secure QR tickets.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className="min-h-screen bg-[#0f0f0f] text-white antialiased">
+      <body className="flex min-h-screen flex-col bg-[#020806] text-white antialiased">
         <Nav />
-        <main className="mx-auto max-w-6xl px-4 py-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 lg:px-6 lg:py-8">{children}</main>
+        <Footer />
       </body>
     </html>
   );

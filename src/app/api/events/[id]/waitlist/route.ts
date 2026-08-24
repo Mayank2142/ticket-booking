@@ -22,7 +22,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!requireRole(user, [Role.CUSTOMER])) return err("Forbidden", 403);
 
   const { categoryId } = await req.json();
-  if (!categoryId) return err("Category required");
+  if (typeof categoryId !== "string" || !categoryId) return err("Category required");
+
+  const eventCategory = await db.categoryPrice.findUnique({
+    where: { eventId_categoryId: { eventId: params.id, categoryId } },
+    select: { id: true },
+  });
+  if (!eventCategory) return err("Category does not belong to this event", 404);
 
   const available = await db.showSeat.count({
     where: {
@@ -40,23 +46,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return err("Already on waitlist", 409);
   }
 
-  const last = await db.waitlistEntry.findFirst({
-    where: { eventId: params.id, categoryId },
-    orderBy: { position: "desc" },
-  });
-  const position = (last?.position ?? 0) + 1;
-
-  const entry = await db.waitlistEntry.upsert({
-    where: { eventId_categoryId_userId: { eventId: params.id, categoryId, userId: user!.id } },
-    create: { eventId: params.id, categoryId, userId: user!.id, position, status: WaitlistStatus.WAITING },
-    update: {
-      position,
-      status: WaitlistStatus.WAITING,
-      offerToken: null,
-      offerExpiresAt: null,
-      offeredSeatId: null,
-    },
-  });
+  let entry;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      entry = await db.$transaction(async (tx) => {
+        const last = await tx.waitlistEntry.aggregate({
+          where: { eventId: params.id, categoryId },
+          _max: { position: true },
+        });
+        const position = (last._max.position ?? 0) + 1;
+        return tx.waitlistEntry.upsert({
+          where: { eventId_categoryId_userId: { eventId: params.id, categoryId, userId: user!.id } },
+          create: { eventId: params.id, categoryId, userId: user!.id, position, status: WaitlistStatus.WAITING },
+          update: {
+            position,
+            status: WaitlistStatus.WAITING,
+            offerToken: null,
+            offerExpiresAt: null,
+            offeredSeatId: null,
+            offerNotifiedAt: null,
+            offerNotificationAttempts: 0,
+          },
+        });
+      });
+      break;
+    } catch (error) {
+      if (attempt === 2) {
+        console.error("[waitlist:error] Queue position could not be assigned", error);
+        return err("Waitlist is busy; please try again", 409);
+      }
+    }
+  }
 
   return ok({ entry }, 201);
 }

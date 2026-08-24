@@ -75,7 +75,7 @@ async function main() {
         type: "CONCERT",
         description: "Live music night",
         venueId: venue.id,
-        date: "2026-09-15",
+        date: "2030-09-15",
         time: "19:30",
         organiserId: organiser.id,
         prices: {

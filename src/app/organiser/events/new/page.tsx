@@ -53,16 +53,17 @@ export default function NewEventPage() {
 
   return (
     <AuthGate roles={["ORGANISER", "ADMIN"]}>
-      <div className="mx-auto max-w-lg space-y-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Create event</h1>
-        <form onSubmit={onSubmit} className="card space-y-3 p-5">
-          <input name="title" required placeholder="Title" className="input w-full" />
-          <select name="type" className="input w-full">
+      <div className="mx-auto max-w-3xl space-y-7 pb-10">
+        <header><p className="section-kicker">Organiser studio</p><h1 className="section-title">Create a new listing</h1><p className="mt-2 text-sm muted">Publish a movie or live event with category-specific ticket prices.</p></header>
+        <form onSubmit={onSubmit} className="card space-y-6 p-6 sm:p-8">
+          <div className="grid gap-4 sm:grid-cols-2">
+          <label className="space-y-2 text-sm"><span className="muted">Event title</span><input name="title" required placeholder="Midnight premiere" className="input w-full" /></label>
+          <label className="space-y-2 text-sm"><span className="muted">Event type</span><select name="type" className="input w-full">
             <option value="CONCERT">Concert</option>
             <option value="MOVIE">Movie</option>
-          </select>
-          <textarea name="description" placeholder="Description" className="input w-full min-h-[80px] rounded-2xl" />
-          <select
+          </select></label></div>
+          <label className="block space-y-2 text-sm"><span className="muted">Description</span><textarea name="description" placeholder="Tell customers what makes this show unmissable…" className="input min-h-[110px] w-full resize-y rounded-2xl" /></label>
+          <label className="block space-y-2 text-sm"><span className="muted">Venue</span><select
             value={venueId}
             onChange={(e) => setVenueId(e.target.value)}
             required
@@ -72,21 +73,21 @@ export default function NewEventPage() {
             {venues.map((v) => (
               <option key={v.id} value={v.id}>{v.name}</option>
             ))}
-          </select>
-          <input name="date" type="date" required className="input w-full" />
-          <input name="time" type="time" required className="input w-full" />
-          {venue?.categories.map((c) => (
-            <input
+          </select></label>
+          <div className="grid gap-4 sm:grid-cols-2"><label className="space-y-2 text-sm"><span className="muted">Show date</span><input name="date" type="date" required className="input w-full" /></label><label className="space-y-2 text-sm"><span className="muted">Start time</span><input name="time" type="time" required className="input w-full" /></label></div>
+          {venue && <div><p className="label">Category pricing</p><div className="mt-3 grid gap-3 sm:grid-cols-2">{venue.categories.map((c) => (
+            <label key={c.id} className="space-y-2 text-sm"><span className="muted">{c.name} price (₹)</span><input
               key={c.id}
               type="number"
+              min="1"
               required
-              placeholder={`${c.name} price`}
+              placeholder="0"
               className="input w-full"
               onChange={(e) => setPrices((p) => ({ ...p, [c.id]: e.target.value }))}
-            />
-          ))}
-          {message && <p className="text-sm muted">{message}</p>}
-          <button type="submit" className="btn btn-primary w-full">Create</button>
+            /></label>
+          ))}</div></div>}
+          {message && <p className="message">{message}</p>}
+          <div className="flex justify-end"><button type="submit" className="btn btn-primary min-w-40">Publish event →</button></div>
         </form>
       </div>
     </AuthGate>

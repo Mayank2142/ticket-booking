@@ -22,11 +22,14 @@ export default function OrganiserSummaryPage() {
 
   if (!summary) return <p className="muted text-sm">Loading...</p>;
 
+  const maxBooked = Math.max(1, ...summary.byCategory.map((row) => row.booked));
+
   return (
     <AuthGate roles={["ORGANISER", "ADMIN"]}>
-      <div className="space-y-6">
+      <div className="space-y-7 pb-10">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{summary.event.title}</h1>
+          <p className="section-kicker">Sales report</p>
+          <h1 className="section-title">{summary.event.title}</h1>
           <p className="mt-1 text-sm muted">{summary.event.date} · {summary.event.time}</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
@@ -39,7 +42,9 @@ export default function OrganiserSummaryPage() {
             <p className="mt-1 text-3xl font-semibold">₹{summary.revenue}</p>
           </div>
         </div>
+        <div className="grid gap-5 lg:grid-cols-[1fr_.8fr]">
         <div className="card overflow-hidden">
+          <div className="border-b border-white/10 px-5 py-4"><h2 className="font-semibold">Category breakdown</h2></div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/10 text-left">
@@ -58,6 +63,8 @@ export default function OrganiserSummaryPage() {
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="card p-5"><p className="label">Tickets sold by category</p><div className="mt-6 space-y-5">{summary.byCategory.map((row) => <div key={row.category}><div className="mb-2 flex justify-between text-sm"><span>{row.category}</span><span className="muted">{row.booked}</span></div><div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><div className="h-full rounded-full bg-emerald-400" style={{ width: `${(row.booked / maxBooked) * 100}%` }} /></div></div>)}</div></div>
         </div>
       </div>
     </AuthGate>

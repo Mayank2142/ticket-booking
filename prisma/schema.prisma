@@ -144,6 +144,8 @@ model Booking {
   ref         String        @unique
   status      BookingStatus @default(CONFIRMED)
   totalAmount Float
+  ticketEmailSentAt DateTime?
+  ticketEmailAttempts Int       @default(0)
   createdAt   DateTime      @default(now())
 
   seats BookingSeat[]
@@ -172,8 +174,11 @@ model WaitlistEntry {
   offerToken     String?        @unique
   offerExpiresAt DateTime?
   offeredSeatId  String?
+  offerNotifiedAt DateTime?
+  offerNotificationAttempts Int @default(0)
   createdAt      DateTime       @default(now())
 
   @@unique([eventId, categoryId, userId])
+  @@unique([eventId, categoryId, position])
   @@index([eventId, categoryId, status, position])
 }

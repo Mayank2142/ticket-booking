@@ -4,12 +4,14 @@ import { err, ok } from "@/lib/api";
 import { getUser, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { categoryAvailability, expireStaleOffers, holdSeats, releaseExpiredHolds } from "@/lib/seats";
+import { validateSeatIds, ValidationError } from "@/lib/validation";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   await expireStaleOffers(params.id);
   await releaseExpiredHolds(params.id);
+  const user = await getUser(req);
 
-  const showSeats = await db.showSeat.findMany({
+  const seatRows = await db.showSeat.findMany({
     where: { eventId: params.id },
     include: { seat: { include: { category: true } } },
     orderBy: [{ seat: { row: "asc" } }, { seat: { col: "asc" } }],
@@ -21,13 +23,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   });
 
   const availability: Record<string, number> = {};
-  for (const ss of showSeats) {
+  for (const ss of seatRows) {
     const cid = ss.seat.categoryId;
     if (availability[cid] === undefined) {
       availability[cid] = await categoryAvailability(params.id, cid);
     }
   }
 
+  const showSeats = seatRows.map(({ heldById, ...showSeat }) => ({
+    ...showSeat,
+    heldByMe: !!user && heldById === user.id,
+  }));
   return ok({ showSeats, layout: venue?.venue, availability });
 }
 
@@ -35,11 +41,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const user = await getUser(req);
   if (!requireRole(user, [Role.CUSTOMER])) return err("Forbidden", 403);
 
-  const { seatIds, offerToken } = await req.json();
-  if (!Array.isArray(seatIds) || !seatIds.length) return err("Select seats");
+  const { seatIds: rawSeatIds, offerToken } = await req.json();
+  let seatIds: string[];
+  try {
+    seatIds = validateSeatIds(rawSeatIds);
+  } catch (error) {
+    return err(error instanceof ValidationError ? error.message : "Invalid seat selection");
+  }
 
   try {
-    const result = await holdSeats(params.id, seatIds, user!.id, offerToken);
+    const result = await holdSeats(params.id, seatIds, user!.id, typeof offerToken === "string" ? offerToken : undefined);
     return ok(result);
   } catch (e) {
     return err(e instanceof Error ? e.message : "Hold failed", 409);

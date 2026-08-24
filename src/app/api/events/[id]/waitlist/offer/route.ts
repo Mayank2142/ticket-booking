@@ -10,7 +10,6 @@ export async function GET(req: NextRequest) {
   const user = await getUser(req);
   const offer = await getWaitlistOffer(token, user?.id);
   if (!offer) return err("Invalid or expired offer", 404);
-  if (user && offer.userId !== user.id) return err("This offer belongs to another account", 403);
 
   return ok({ offer, requiresLogin: !user });
 }

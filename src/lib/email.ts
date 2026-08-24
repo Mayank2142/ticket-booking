@@ -1,13 +1,20 @@
 import nodemailer from "nodemailer";
 import { bookingQrDataUrl } from "./qr";
 
+export type EmailDeliveryResult = {
+  delivered: boolean;
+  mode: "smtp" | "console";
+  message: string;
+};
+
 async function getTransport() {
-  const { SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT } = process.env;
+  const { SMTP_HOST, SMTP_USER, SMTP_PASS, SMTP_PORT, SMTP_SECURE } = process.env;
   if (!SMTP_HOST || !SMTP_USER || !SMTP_PASS) return null;
+  const port = Number(SMTP_PORT ?? 587);
   return nodemailer.createTransport({
     host: SMTP_HOST,
-    port: Number(SMTP_PORT ?? 587),
-    secure: false,
+    port,
+    secure: SMTP_SECURE === "true" || port === 465,
     auth: { user: SMTP_USER, pass: SMTP_PASS },
   });
 }
@@ -26,17 +33,23 @@ export async function sendTicketEmail(opts: {
 
   const transport = await getTransport();
   if (!transport) {
-    console.log("[email:fallback]", { to: opts.to, subject, bookingRef: opts.bookingRef });
-    return;
+    console.log("[email:preview]", { to: opts.to, subject, bookingRef: opts.bookingRef });
+    return { delivered: false, mode: "console", message: "SMTP is not configured; email queued for retry" } satisfies EmailDeliveryResult;
   }
 
-  await transport.sendMail({
-    from,
-    to: opts.to,
-    subject,
-    text,
-    attachments: [{ filename: "ticket.png", content: qr.split(",")[1], encoding: "base64" }],
-  });
+  try {
+    await transport.sendMail({
+      from,
+      to: opts.to,
+      subject,
+      text,
+      attachments: [{ filename: "ticket.png", content: qr.split(",")[1], encoding: "base64" }],
+    });
+    return { delivered: true, mode: "smtp", message: "Ticket email delivered" } satisfies EmailDeliveryResult;
+  } catch (error) {
+    console.error("[email:error] Ticket delivery failed", error);
+    return { delivered: false, mode: "smtp", message: "Email delivery failed; queued for retry" } satisfies EmailDeliveryResult;
+  }
 }
 
 export async function sendWaitlistOfferEmail(opts: {
@@ -53,9 +66,27 @@ export async function sendWaitlistOfferEmail(opts: {
 
   const transport = await getTransport();
   if (!transport) {
-    console.log("[email:fallback]", { to: opts.to, subject, offerUrl: opts.offerUrl });
-    return;
+    console.log("[email:preview]", { to: opts.to, subject, offerUrl: opts.offerUrl });
+    return { delivered: false, mode: "console", message: "SMTP is not configured; email queued for retry" } satisfies EmailDeliveryResult;
   }
 
-  await transport.sendMail({ from, to: opts.to, subject, text });
+  try {
+    await transport.sendMail({ from, to: opts.to, subject, text });
+    return { delivered: true, mode: "smtp", message: "Waitlist email delivered" } satisfies EmailDeliveryResult;
+  } catch (error) {
+    console.error("[email:error] Waitlist delivery failed", error);
+    return { delivered: false, mode: "smtp", message: "Email delivery failed; queued for retry" } satisfies EmailDeliveryResult;
+  }
+}
+
+export async function verifyEmailTransport() {
+  const transport = await getTransport();
+  if (!transport) return { configured: false, verified: false, message: "SMTP variables are incomplete" };
+  try {
+    await transport.verify();
+    return { configured: true, verified: true, message: "SMTP connection verified" };
+  } catch (error) {
+    console.error("[email:error] SMTP verification failed", error);
+    return { configured: true, verified: false, message: "SMTP connection could not be verified" };
+  }
 }

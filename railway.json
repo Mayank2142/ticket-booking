@@ -1,10 +1,11 @@
 {
   "$schema": "https://railway.app/railway.schema.json",
   "build": {
-    "buildCommand": "npm run build && npx prisma migrate deploy"
+    "buildCommand": "npm run build"
   },
   "deploy": {
-    "startCommand": "npm start",
+    "startCommand": "npm run db:deploy && npm start",
+    "healthcheckPath": "/api/health",
     "restartPolicyType": "ON_FAILURE"
   }
 }
