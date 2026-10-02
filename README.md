@@ -297,7 +297,7 @@ npm run dev:legacy     # Existing Next.js UI and API on port 3000
 npm run dev:web        # New React + Vite frontend on port 5173
 npm run build          # Prisma generation + production build
 npm run build:web      # Type-check and build the React frontend
-npm run lint           # ESLint 9 flat-config validation
+npm run lint           # ESLint flat-config validation
 npm run typecheck      # TypeScript validation
 npm run typecheck:web  # React frontend TypeScript validation
 npm test               # Sixteen isolated API/domain/security tests
