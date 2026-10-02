@@ -2,12 +2,21 @@ import { randomBytes } from "crypto";
 import { Prisma, SeatStatus, WaitlistStatus } from "@/generated/prisma/client";
 import { HOLD_TTL_MINUTES, WAITLIST_OFFER_MINUTES } from "./constants";
 import { deliverWaitlistOffer } from "./delivery";
-import { db } from "./db";
+import { db, serializableTransaction } from "./db";
+import { publishSeatUpdate } from "./realtime";
 
 class WaitlistClaimConflict extends Error {}
 class SeatClaimConflict extends Error {}
 
 export async function releaseExpiredHolds(eventId?: string) {
+  const expired = await db.showSeat.findMany({
+    where: {
+      status: SeatStatus.HELD,
+      heldUntil: { lt: new Date() },
+      ...(eventId ? { eventId } : {}),
+    },
+    select: { eventId: true },
+  });
   const result = await db.showSeat.updateMany({
     where: {
       status: SeatStatus.HELD,
@@ -21,6 +30,11 @@ export async function releaseExpiredHolds(eventId?: string) {
       version: { increment: 1 },
     },
   });
+  if (result.count) {
+    for (const affectedEventId of Array.from(new Set(expired.map((seat) => seat.eventId)))) {
+      void publishSeatUpdate(affectedEventId, "released");
+    }
+  }
   return result.count;
 }
 
@@ -111,7 +125,7 @@ export async function holdSeats(
   await expireStaleOffers(eventId);
   await releaseExpiredHolds(eventId);
 
-  return db.$transaction(async (tx) => {
+  const result = await serializableTransaction(async (tx) => {
     const offer = await validateOfferAccess(tx, eventId, seatIds, userId, offerToken);
     const heldUntil = offer?.offerExpiresAt ?? new Date(Date.now() + HOLD_TTL_MINUTES * 60_000);
     const seats = await tx.showSeat.findMany({
@@ -152,6 +166,8 @@ export async function holdSeats(
 
     return { heldUntil };
   });
+  void publishSeatUpdate(eventId, "held");
+  return result;
 }
 
 function bookingRef() {
@@ -167,7 +183,7 @@ export async function confirmBooking(
   await expireStaleOffers(eventId);
   await releaseExpiredHolds(eventId);
 
-  return db.$transaction(async (tx) => {
+  const booking = await serializableTransaction(async (tx) => {
     const offer = await validateOfferAccess(tx, eventId, seatIds, userId, offerToken);
     const now = new Date();
     const showSeats = await tx.showSeat.findMany({
@@ -244,6 +260,8 @@ export async function confirmBooking(
 
     return booking;
   });
+  void publishSeatUpdate(eventId, "booked");
+  return booking;
 }
 
 export async function offerNextWaitlistForSeat(eventId: string, seatId: string) {
@@ -255,7 +273,7 @@ export async function offerNextWaitlistForSeat(eventId: string, seatId: string) 
     const offerExpiresAt = new Date(Date.now() + WAITLIST_OFFER_MINUTES * 60_000);
 
     try {
-      const claimed = await db.$transaction(async (tx) => {
+      const claimed = await serializableTransaction(async (tx) => {
         const showSeat = await tx.showSeat.findFirst({ where: { eventId, seatId } });
         if (!showSeat || showSeat.status !== SeatStatus.AVAILABLE) return null;
 
@@ -293,6 +311,7 @@ export async function offerNextWaitlistForSeat(eventId: string, seatId: string) 
       });
 
       if (!claimed) return null;
+      void publishSeatUpdate(eventId, "waitlist-offer");
       const email = await deliverWaitlistOffer(claimed.entryId);
       return { ...claimed, email };
     } catch (error) {
@@ -316,7 +335,7 @@ export async function expireStaleOffers(eventId?: string) {
 
   let expiredCount = 0;
   for (const entry of stale) {
-    const expired = await db.$transaction(async (tx) => {
+    const expired = await serializableTransaction(async (tx) => {
       const updated = await tx.waitlistEntry.updateMany({
         where: { id: entry.id, status: WaitlistStatus.OFFERED, offerExpiresAt: { lt: now } },
         data: {
@@ -349,6 +368,7 @@ export async function expireStaleOffers(eventId?: string) {
 
     if (!expired) continue;
     expiredCount += 1;
+    void publishSeatUpdate(entry.eventId, "offer-expired");
     if (entry.offeredSeatId) {
       const showSeat = await db.showSeat.findFirst({
         where: { eventId: entry.eventId, seatId: entry.offeredSeatId },
@@ -363,7 +383,7 @@ export async function expireStaleOffers(eventId?: string) {
 }
 
 export async function cancelBooking(bookingId: string, userId: string) {
-  const cancelled = await db.$transaction(async (tx) => {
+  const cancelled = await serializableTransaction(async (tx) => {
     const booking = await tx.booking.findUnique({
       where: { id: bookingId },
       include: { seats: { select: { seatId: true } } },
@@ -393,6 +413,7 @@ export async function cancelBooking(bookingId: string, userId: string) {
   });
 
   const offers = [];
+  void publishSeatUpdate(cancelled.eventId, "cancelled");
   for (const seatId of cancelled.freedSeats) {
     offers.push(await offerNextWaitlistForSeat(cancelled.eventId, seatId));
   }

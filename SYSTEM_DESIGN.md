@@ -2,7 +2,7 @@
 
 ## Overview
 
-CineBook is a full-stack Next.js application with Prisma and SQLite. It supports admin, organiser, and customer roles. Venues store reusable physical layouts, while every event receives its own `ShowSeat` row for each physical seat. This materialised inventory keeps live state—`AVAILABLE`, `HELD`, or `BOOKED`—independent between shows at the same venue.
+CineBook uses a standalone React frontend, a typed API layer, Prisma, PostgreSQL, and optional Redis fan-out. It supports admin, organiser, and customer roles. Reusable `Content` records hold movie/concert metadata and connect multiple scheduled `Event` shows. City/auditorium-labelled venues store physical layouts, while every show receives its own `ShowSeat` inventory. Favourites target content rather than one showtime; lightweight recommendations score genre/language affinity and booking popularity.
 
 ## Seat holds and TTL
 
@@ -15,7 +15,9 @@ HELD -> HELD only when held by the same customer and not expired
 
 The update stores `heldById`, `heldUntil`, and increments `version`. Each update must affect exactly one row; otherwise the transaction rolls back. The default TTL is ten minutes and is configurable through `SEAT_HOLD_TTL_MINUTES`.
 
-Abandoned holds are released in two ways. Seat-map reads perform lazy expiry before returning state, preventing a viewer from seeing stale inventory. A protected scheduled endpoint performs a global sweep and retries pending emails. The frontend polls the seat map every three seconds, providing near-real-time updates without the operational cost of WebSockets.
+Abandoned holds are released in two ways. Seat-map reads perform lazy expiry before returning state. An always-on worker sweeps expired holds/offers and retries pending emails; a protected cron endpoint invokes the same idempotent service as a fallback.
+
+After each committed inventory transition, the API publishes a small invalidation through local events and optional Redis Pub/Sub. Server-Sent Events notify browsers to re-read authoritative PostgreSQL state. Redis never stores seat ownership, and a 30-second browser poll preserves eventual refresh if Redis or SSE is unavailable.
 
 Booking repeats the concurrency guard. Every seat must be `HELD` by that customer with `heldUntil > now`. The transaction conditionally changes the seats to `BOOKED`, calculates the category-based total, and creates the booking and booking-seat records. Thus simultaneous confirmations cannot both succeed.
 
@@ -23,7 +25,7 @@ Booking repeats the concurrency guard. Every seat must be `HELD` by that custome
 
 Correctness is based on database state transitions rather than an in-memory mutex, which would fail across processes. Conditional `updateMany` operations act as compare-and-swap operations. Affected-row counts detect a lost race. Cancellation uses the same approach: `CONFIRMED -> CANCELLED` must affect one row, making duplicate or simultaneous cancellation requests idempotent.
 
-SQLite serialises writes and is appropriate for the single-instance assessment deployment. For sustained high demand or horizontal scaling, the production evolution is PostgreSQL with serializable transactions or row-level locks and retry handling.
+Production uses PostgreSQL. High-contention seat, booking, cancellation, offer, and expiry flows run at serializable isolation. Prisma `P2034` conflicts are retried up to three times. Conditional row updates remain the final compare-and-swap guard, so correctness does not depend on one API process. The `pg` pool is bounded through environment variables. SQLite remains only as a fast isolated regression profile.
 
 ## Waitlist assignment
 

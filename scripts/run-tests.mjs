@@ -16,6 +16,7 @@ const env = {
   SMTP_HOST: "",
   SMTP_USER: "",
   SMTP_PASS: "",
+  REDIS_URL: "",
 };
 
 function run(args) {
@@ -28,7 +29,15 @@ function run(args) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-run([resolve("node_modules", "prisma", "build", "index.js"), "migrate", "deploy"]);
-run([resolve("node_modules", "tsx", "dist", "cli.mjs"), "--test", "tests/booking-lifecycle.test.ts"]);
+run([resolve("node_modules", "prisma", "build", "index.js"), "generate", "--schema", "prisma/schema.test.prisma"]);
+run([resolve("node_modules", "prisma", "build", "index.js"), "migrate", "deploy", "--config", "prisma.test.config.ts"]);
+run([
+  resolve("node_modules", "tsx", "dist", "cli.mjs"),
+  "--test",
+  "tests/booking-lifecycle.test.ts",
+  "tests/catalog.test.ts",
+  "tests/realtime.test.ts",
+  "tests/security.test.ts",
+]);
 
 if (existsSync(databasePath)) rmSync(databasePath);

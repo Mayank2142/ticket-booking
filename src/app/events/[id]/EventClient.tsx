@@ -6,28 +6,21 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { QrTicket } from "@/components/QrTicket";
 import { SeatMap } from "@/components/SeatMap";
+import type {
+  BookingConfirmationDto,
+  EventDetailDto,
+  SeatMapDto,
+  ShowSeatDto,
+  WaitlistEntryDto,
+  WaitlistOfferDto,
+} from "@/contracts/api";
 import { api, getToken } from "@/lib/client";
 import { displaySeatLabel, eventArtwork, eventPresentation, formatEventDate } from "@/lib/presentation";
 
-type ShowSeat = {
-  seatId: string;
-  status: string;
-  heldByMe: boolean;
-  seat: { label: string; row: number; col: number; categoryId: string; category: { name: string; color: string } };
-};
-type EventDetail = {
-  id: string;
-  title: string;
-  type: "MOVIE" | "CONCERT";
-  description?: string | null;
-  date: string;
-  time: string;
-  venue: { name: string; categories: { id: string; name: string; color: string }[] };
-  organiser: { name: string };
-  prices: { categoryId: string; price: number; category: { name: string } }[];
-};
-type OfferInfo = { seatId: string | null; seatLabel: string | null; categoryName: string; expiresAt: string | null };
-type WaitlistEntry = { id: string; position: number; status: string; category: { id: string; name: string } };
+type ShowSeat = ShowSeatDto;
+type EventDetail = EventDetailDto;
+type OfferInfo = WaitlistOfferDto;
+type WaitlistEntry = WaitlistEntryDto;
 type View = "details" | "seats" | "checkout" | "confirmed";
 
 export default function EventClient() {
@@ -45,14 +38,14 @@ export default function EventClient() {
   const [offer, setOffer] = useState<OfferInfo | null>(null);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [heldUntil, setHeldUntil] = useState<string | null>(null);
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
-  const [confirmation, setConfirmation] = useState<{ ref: string; total: number; seats: string[]; emailDelivered: boolean; emailMessage: string } | null>(null);
+  const [confirmation, setConfirmation] = useState<BookingConfirmationDto | null>(null);
 
   const loadSeats = useCallback(async () => {
-    const data = await api<{ showSeats: ShowSeat[]; layout: { rows: number; cols: number }; availability: Record<string, number> }>(`/api/events/${id}/seats`);
+    const data = await api<SeatMapDto>(`/api/events/${id}/seats`);
     setShowSeats(data.showSeats);
     setLayout(data.layout);
     setAvailability(data.availability ?? {});
@@ -230,7 +223,7 @@ function Checkout({ event, customer, seats, total, remaining, working, onBack, o
   return <div className="mx-auto max-w-5xl space-y-6"><button onClick={onBack} className="btn">← Back to seats</button><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="section-kicker">Secure checkout</p><h1 className="section-title">Review your booking</h1></div><Countdown remaining={remaining}/></div><div className="grid gap-5 lg:grid-cols-[1fr_360px]"><section className="card overflow-hidden"><div className="relative h-56"><Image src={eventArtwork(event.type)} alt="" fill sizes="800px" className={`object-cover ${event.type === "CONCERT" ? "object-[68%_center]" : ""}`}/><div className="absolute inset-0 bg-gradient-to-t from-[#08130e] to-transparent"/><div className="absolute bottom-5 left-5"><p className="label">{event.type}</p><h2 className="mt-2 text-2xl font-bold">{event.title}</h2></div></div><div className="grid gap-5 p-6 sm:grid-cols-2"><Meta label="Date & time" value={`${formatEventDate(event.date)} · ${event.time}`}/><Meta label="Venue" value={event.venue.name}/><Meta label="Selected seats" value={seats.join(", ")}/><Meta label="Tickets" value={String(seats.length)}/></div></section><aside className="card p-6"><p className="section-kicker">Payment summary</p><div className="mt-5 space-y-4 text-sm"><div className="flex justify-between text-white/55"><span>Tickets ({seats.length})</span><span>₹{total}</span></div><div className="flex justify-between text-white/55"><span>Convenience fee</span><span>₹0</span></div><div className="border-t border-white/10 pt-4"><div className="flex items-end justify-between"><span className="font-semibold">Total</span><strong className="text-2xl">₹{total}</strong></div></div></div><div className="mt-6 rounded-2xl bg-white/[0.04] p-4 text-sm"><p className="font-medium">Customer</p>{customer ? <><p className="mt-2 text-white/55">{customer.name}</p><p className="mt-1 break-all text-xs text-white/40">{customer.email}</p></> : <p className="mt-2 text-white/45">Log in to confirm this booking.</p>}</div><button disabled={working || remaining === 0 || !customer} onClick={onConfirm} className="btn btn-primary mt-6 w-full">{working ? "Confirming…" : "Confirm booking"}</button><p className="mt-3 text-center text-[11px] leading-5 text-white/35">Your QR ticket will be generated immediately and emailed after confirmation.</p></aside></div></div>;
 }
 
-function Confirmation({ event, confirmation }: { event: EventDetail; confirmation: { ref: string; total: number; seats: string[]; emailDelivered: boolean; emailMessage: string } }) {
+function Confirmation({ event, confirmation }: { event: EventDetail; confirmation: BookingConfirmationDto }) {
   return <div className="mx-auto max-w-4xl"><section className="relative overflow-hidden rounded-[28px] border border-emerald-300/20 bg-[radial-gradient(circle_at_top,rgba(16,185,129,.16),transparent_45%),#06100b] p-6 text-center shadow-2xl sm:p-10"><div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-400 text-3xl font-bold text-emerald-950 shadow-xl shadow-emerald-500/20">✓</div><p className="section-kicker mt-7">Payment successful</p><h1 className="mt-2 text-3xl font-bold sm:text-4xl">Booking confirmed</h1><p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-white/50">{confirmation.emailDelivered ? "Your QR ticket has also been delivered to your email." : confirmation.emailMessage}</p><div className="mx-auto mt-8 grid max-w-2xl overflow-hidden rounded-[24px] border border-white/10 bg-white/[0.04] text-left sm:grid-cols-[210px_1fr]"><div className="grid place-items-center border-b border-white/10 bg-white p-5 sm:border-b-0 sm:border-r"><QrTicket reference={confirmation.ref} size={166}/></div><div className="space-y-4 p-6"><div><p className="label">Booking reference</p><p className="mt-1 font-mono text-xl font-bold tracking-wider">{confirmation.ref}</p></div><div><p className="text-lg font-semibold">{event.title}</p><p className="mt-1 text-sm text-white/45">{formatEventDate(event.date)} · {event.time}</p><p className="mt-1 text-sm text-white/45">{event.venue.name}</p></div><div className="grid grid-cols-2 gap-4 border-t border-dashed border-white/15 pt-4"><Meta label="Seats" value={confirmation.seats.join(", ")}/><Meta label="Total" value={`₹${confirmation.total}`}/></div></div></div><div className="mt-8 flex flex-wrap justify-center gap-3"><Link href="/bookings" className="btn btn-primary">View my bookings</Link><Link href="/" className="btn">Explore more shows</Link></div></section></div>;
 }
 

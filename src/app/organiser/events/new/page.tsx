@@ -3,13 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGate } from "@/components/AuthGate";
+import type { VenueOptionDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 
-type Venue = {
-  id: string;
-  name: string;
-  categories: { id: string; name: string }[];
-};
+type Venue = VenueOptionDto;
 
 export default function NewEventPage() {
   const router = useRouter();

@@ -1,35 +1,65 @@
 {
   "name": "ticket-booking-system",
   "version": "0.1.0",
+  "type": "module",
   "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": "22.x"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    },
+    "prisma": {
+      "mysql2": "3.23.1"
+    }
+  },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev:legacy": "next dev",
+    "dev:web": "npm run dev --workspace @cinebook/web",
+    "db:generate": "prisma generate && prisma generate --schema prisma/schema.test.prisma",
+    "build": "npm run db:generate && next build",
+    "build:web": "npm run build --workspace @cinebook/web",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "typecheck:web": "npm run typecheck --workspace @cinebook/web",
     "test": "node scripts/run-tests.mjs",
+    "test:postgres": "node scripts/run-postgres-tests.mjs",
+    "test:e2e": "playwright test",
     "email:verify": "tsx scripts/verify-email.ts",
     "cron:cleanup": "tsx scripts/invoke-cleanup.ts",
+    "worker:start": "tsx apps/worker/src/index.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "db:deploy:sqlite": "prisma migrate deploy --config prisma.test.config.ts",
+    "db:migrate:sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
     "@prisma/adapter-better-sqlite3": "^7.9.1",
+    "@prisma/adapter-pg": "7.9.1",
     "@prisma/client": "^7.9.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
-    "next": "14.2.35",
-    "nodemailer": "^9.0.5",
+    "next": "^16.3.8",
+    "nodemailer": "^10.0.13",
+    "pg": "8.16.3",
     "qrcode": "^1.5.4",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "redis": "5.9.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.55.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^9.6.0",
     "@types/jsonwebtoken": "^9.0.10",
@@ -38,8 +68,8 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18",
     "@types/react-dom": "^18",
-    "eslint": "^8",
-    "eslint-config-next": "14.2.35",
+    "eslint": "^9.39.3",
+    "eslint-config-next": "^16.3.8",
     "postcss": "^8",
     "prisma": "^7.9.1",
     "tailwindcss": "^3.4.1",

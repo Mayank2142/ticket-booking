@@ -3,9 +3,14 @@ import { err, ok } from "@/lib/api";
 import { signToken, verifyPassword } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { normalizeEmail, ValidationError } from "@/lib/validation";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
-  const { email: rawEmail, password } = await req.json();
+  const limited = await enforceRateLimit(req, { scope: "auth-login", limit: 10, windowMs: 15 * 60_000 });
+  if (limited) return limited;
+  const body = await req.json().catch(() => null) as { email?: unknown; password?: unknown } | null;
+  if (!body) return err("Invalid credentials", 401);
+  const { email: rawEmail, password } = body;
   let email: string;
   try {
     email = normalizeEmail(rawEmail);

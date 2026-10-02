@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 enum Role {
@@ -48,11 +48,15 @@ model User {
   bookings  Booking[]
   waitlist  WaitlistEntry[]
   heldSeats ShowSeat[] @relation("HeldBy")
+  favourites Favourite[]
 }
 
 model Venue {
   id         String         @id @default(cuid())
   name       String
+  city       String         @default("Delhi")
+  address    String?
+  auditorium String         @default("Main Auditorium")
   rows       Int
   cols       Int
   createdAt  DateTime       @default(now())
@@ -60,6 +64,38 @@ model Venue {
   categories SeatCategory[]
   seats      Seat[]
   events     Event[]
+}
+
+model Content {
+  id              String    @id @default(cuid())
+  identityKey     String    @unique
+  title           String
+  type            EventType
+  description     String?
+  language        String    @default("Hindi")
+  format          String    @default("2D")
+  genre           String    @default("Entertainment")
+  durationMinutes Int       @default(120)
+  certificate     String?
+  posterUrl       String?
+  createdAt       DateTime  @default(now())
+
+  shows      Event[]
+  favourites Favourite[]
+
+  @@index([type, language, genre])
+}
+
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, contentId])
+  @@index([userId, createdAt])
 }
 
 model SeatCategory {
@@ -96,6 +132,8 @@ model Event {
   organiser   User      @relation(fields: [organiserId], references: [id])
   venueId     String
   venue       Venue     @relation(fields: [venueId], references: [id])
+  contentId   String?
+  content     Content?  @relation(fields: [contentId], references: [id])
   title       String
   type        EventType
   description String?
@@ -107,6 +145,8 @@ model Event {
   showSeats ShowSeat[]
   bookings  Booking[]
   waitlist  WaitlistEntry[]
+
+  @@index([contentId, date, time])
 }
 
 model CategoryPrice {

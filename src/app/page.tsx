@@ -4,20 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { EventCard } from "@/components/EventCard";
+import type { EventSummaryDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 import { eventArtwork, eventPresentation, formatEventDate, startingPrice } from "@/lib/presentation";
 
-type Event = {
-  id: string;
-  title: string;
-  type: "MOVIE" | "CONCERT";
-  description?: string | null;
-  date: string;
-  time: string;
-  venue: { name: string };
-  organiser: { name: string };
-  prices: { price: number; category: { name: string } }[];
-};
+type Event = EventSummaryDto;
 
 const comingSoon = [
   { title: "Emerald Horizon", date: "12 Dec", genre: "Sci-fi · Adventure", image: "/images/portal-poster.png" },

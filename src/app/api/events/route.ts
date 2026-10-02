@@ -4,22 +4,36 @@ import { err, ok } from "@/lib/api";
 import { getUser, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { validateEventInput, ValidationError } from "@/lib/validation";
+import { contentIdentityKey, toEventSummary } from "@/lib/catalog";
 
 export async function GET(req: NextRequest) {
   const user = await getUser(req);
   const { searchParams } = new URL(req.url);
   const type = searchParams.get("type");
   const q = searchParams.get("q");
+  const city = searchParams.get("city");
+  const language = searchParams.get("language");
+  const format = searchParams.get("format");
+  const date = searchParams.get("date");
   const mine = searchParams.get("mine") === "true";
 
   const events = await db.event.findMany({
     where: {
       ...(type ? { type: type as EventType } : {}),
       ...(q ? { title: { contains: q } } : {}),
+      ...(city ? { venue: { city } } : {}),
+      ...(date ? { date } : {}),
+      ...(language || format ? {
+        content: {
+          ...(language ? { language } : {}),
+          ...(format ? { format } : {}),
+        },
+      } : {}),
       ...(mine && user?.role === Role.ORGANISER ? { organiserId: user.id } : {}),
     },
     include: {
       venue: true,
+      content: true,
       organiser: { select: { name: true } },
       prices: { include: { category: true } },
       _count: { select: { bookings: true } },
@@ -27,7 +41,11 @@ export async function GET(req: NextRequest) {
     orderBy: [{ date: "asc" }, { time: "asc" }],
   });
 
-  return ok({ events });
+  const favourites = user?.role === Role.CUSTOMER
+    ? await db.favourite.findMany({ where: { userId: user.id }, select: { contentId: true } })
+    : [];
+  const favouriteContentIds = new Set(favourites.map((item) => item.contentId));
+  return ok({ events: events.map((event) => toEventSummary(event, favouriteContentIds)) });
 }
 
 export async function POST(req: NextRequest) {
@@ -41,7 +59,10 @@ export async function POST(req: NextRequest) {
     return err(error instanceof ValidationError ? error.message : "Invalid event data");
   }
 
-  const { title, type, description, venueId, date, time, prices } = input;
+  const {
+    title, type, description, language, format, genre, durationMinutes,
+    certificate, venueId, date, time, prices,
+  } = input;
 
   const venue = await db.venue.findUnique({
     where: { id: venueId },
@@ -57,11 +78,28 @@ export async function POST(req: NextRequest) {
   }
 
   const event = await db.$transaction(async (tx) => {
+    const identityKey = contentIdentityKey({ title, type, language, format });
+    const content = await tx.content.upsert({
+      where: { identityKey },
+      update: { description, genre, durationMinutes, certificate },
+      create: {
+        identityKey,
+        title,
+        type,
+        description,
+        language,
+        format,
+        genre,
+        durationMinutes,
+        certificate,
+      },
+    });
     const created = await tx.event.create({
       data: {
         title,
         type,
         description,
+        contentId: content.id,
         venueId,
         date,
         time,
@@ -79,8 +117,13 @@ export async function POST(req: NextRequest) {
 
   const full = await db.event.findUnique({
     where: { id: event.id },
-    include: { venue: true, prices: { include: { category: true } } },
+    include: {
+      venue: true,
+      content: true,
+      organiser: { select: { name: true } },
+      prices: { include: { category: true } },
+    },
   });
 
-  return ok({ event: full }, 201);
+  return ok({ event: full ? toEventSummary(full) : null }, 201);
 }

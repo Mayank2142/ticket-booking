@@ -4,12 +4,13 @@ import { err, ok } from "@/lib/api";
 import { getUser, requireRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const user = await getUser(req);
   if (!requireRole(user, [Role.ORGANISER, Role.ADMIN])) return err("Forbidden", 403);
 
   const event = await db.event.findUnique({
-    where: { id: params.id },
+    where: { id },
     include: {
       venue: true,
       bookings: {

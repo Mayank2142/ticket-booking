@@ -2,18 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import type { VenueDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 
-type Category = { id: string; name: string; color: string };
-type Venue = {
-  id: string;
-  name: string;
-  rows: number;
-  cols: number;
-  categories: Category[];
-  seats: { categoryId: string; row: number }[];
-  _count: { events: number };
-};
+type Venue = VenueDto;
 type CategoryDraft = { key: string; name: string; color: string; rows: string };
 
 const defaultCategories = (): CategoryDraft[] => [

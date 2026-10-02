@@ -3,14 +3,10 @@
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import type { EventSalesSummaryDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 
-type Summary = {
-  event: { title: string; date: string; time: string };
-  totalBookings: number;
-  revenue: number;
-  byCategory: { category: string; booked: number; price: number }[];
-};
+type Summary = EventSalesSummaryDto;
 
 export default function OrganiserSummaryPage() {
   const { id } = useParams<{ id: string }>();

@@ -1,10 +1,7 @@
-import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
-import { PrismaClient, Role } from "../src/generated/prisma/client";
+import { Role } from "../src/generated/prisma/client";
 import bcrypt from "bcryptjs";
+import { db } from "../src/lib/db";
 import { seatLabel } from "../src/lib/seats-label";
-
-const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" });
-const db = new PrismaClient({ adapter });
 
 async function main() {
   const password = await bcrypt.hash("password123", 10);
@@ -29,8 +26,16 @@ async function main() {
 
   const venue = await db.venue.upsert({
     where: { id: "seed-venue" },
-    update: {},
-    create: { id: "seed-venue", name: "City Arena", rows: 5, cols: 8 },
+    update: { city: "Delhi NCR", address: "Central Arts District", auditorium: "Emerald Hall" },
+    create: {
+      id: "seed-venue",
+      name: "City Arena",
+      city: "Delhi NCR",
+      address: "Central Arts District",
+      auditorium: "Emerald Hall",
+      rows: 5,
+      cols: 8,
+    },
   });
 
   const premium = await db.seatCategory.upsert({
@@ -66,14 +71,33 @@ async function main() {
   const organiser = await db.user.findUnique({ where: { email: "organiser@demo.com" } });
   if (!organiser) return;
 
+  const content = await db.content.upsert({
+    where: { identityKey: "concert:summer-concert:english:live" },
+    update: {},
+    create: {
+      identityKey: "concert:summer-concert:english:live",
+      title: "Summer Concert",
+      type: "CONCERT",
+      description: "An immersive live music night with arena-scale production.",
+      language: "English",
+      format: "Live",
+      genre: "Pop",
+      durationMinutes: 180,
+      certificate: "ALL",
+    },
+  });
+
   const existingEvent = await db.event.findFirst({ where: { title: "Summer Concert" } });
-  if (!existingEvent) {
+  if (existingEvent) {
+    await db.event.update({ where: { id: existingEvent.id }, data: { contentId: content.id } });
+  } else {
     const seats = await db.seat.findMany({ where: { venueId: venue.id } });
     const event = await db.event.create({
       data: {
         title: "Summer Concert",
         type: "CONCERT",
         description: "Live music night",
+        contentId: content.id,
         venueId: venue.id,
         date: "2030-09-15",
         time: "19:30",

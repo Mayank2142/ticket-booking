@@ -4,7 +4,14 @@ import { VenueInput } from "./validation";
 
 export async function createVenueLayout(tx: Prisma.TransactionClient, input: VenueInput) {
   const venue = await tx.venue.create({
-    data: { name: input.name, rows: input.rows, cols: input.cols },
+    data: {
+      name: input.name,
+      city: input.city,
+      address: input.address,
+      auditorium: input.auditorium,
+      rows: input.rows,
+      cols: input.cols,
+    },
   });
   await addCategoriesAndSeats(tx, venue.id, input);
   return venue;
@@ -19,7 +26,14 @@ export async function replaceVenueLayout(
   await tx.seatCategory.deleteMany({ where: { venueId } });
   const venue = await tx.venue.update({
     where: { id: venueId },
-    data: { name: input.name, rows: input.rows, cols: input.cols },
+    data: {
+      name: input.name,
+      city: input.city,
+      address: input.address,
+      auditorium: input.auditorium,
+      rows: input.rows,
+      cols: input.cols,
+    },
   });
   await addCategoriesAndSeats(tx, venueId, input);
   return venue;

@@ -9,9 +9,13 @@ import {
   validateRegistrationRole,
   ValidationError,
 } from "@/lib/validation";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const limited = await enforceRateLimit(req, { scope: "auth-register", limit: 5, windowMs: 60 * 60_000 });
+  if (limited) return limited;
+  const body = await req.json().catch(() => null) as Record<string, unknown> | null;
+  if (!body) return err("Invalid registration details");
   let email: string;
   let password: string;
   let name: string;

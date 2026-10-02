@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import { err, ok } from "@/lib/api";
-import { expireStaleOffers, releaseExpiredHolds } from "@/lib/seats";
-import { retryPendingEmails } from "@/lib/delivery";
+import { runMaintenanceCycle } from "@/lib/maintenance";
 
 function checkSecret(req: NextRequest) {
   const auth = req.headers.get("authorization");
@@ -14,10 +13,7 @@ function checkSecret(req: NextRequest) {
 }
 
 async function runCleanup() {
-  const expiredOffers = await expireStaleOffers();
-  const releasedHolds = await releaseExpiredHolds();
-  const email = await retryPendingEmails();
-  return ok({ expiredOffers, releasedHolds, email });
+  return ok(await runMaintenanceCycle());
 }
 
 export async function GET(req: NextRequest) {

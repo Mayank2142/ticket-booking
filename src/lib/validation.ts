@@ -42,6 +42,9 @@ export type VenueCategoryInput = {
 
 export type VenueInput = {
   name: string;
+  city: string;
+  address?: string;
+  auditorium: string;
   rows: number;
   cols: number;
   categories: VenueCategoryInput[];
@@ -51,6 +54,12 @@ export function validateVenueInput(body: unknown): VenueInput {
   if (!body || typeof body !== "object") throw new ValidationError("Invalid venue data");
   const input = body as Record<string, unknown>;
   const name = validateName(input.name, "Venue name");
+  const city = input.city === undefined ? "Delhi" : validateName(input.city, "City");
+  const auditorium = input.auditorium === undefined
+    ? "Main Auditorium"
+    : validateName(input.auditorium, "Auditorium");
+  const address = typeof input.address === "string" ? input.address.trim() : undefined;
+  if (address && address.length > 200) throw new ValidationError("Address is too long");
   const rows = Number(input.rows);
   const cols = Number(input.cols);
 
@@ -105,13 +114,18 @@ export function validateVenueInput(body: unknown): VenueInput {
     throw new ValidationError(`Every row needs a category. Missing: ${missingRows.join(", ")}`);
   }
 
-  return { name, rows, cols, categories };
+  return { name, city, address: address || undefined, auditorium, rows, cols, categories };
 }
 
 export type EventInput = {
   title: string;
   type: EventType;
   description?: string;
+  language: string;
+  format: string;
+  genre: string;
+  durationMinutes: number;
+  certificate?: string;
   venueId: string;
   date: string;
   time: string;
@@ -169,10 +183,33 @@ export function validateEventInput(body: unknown): EventInput {
   const description = typeof input.description === "string" ? input.description.trim() : undefined;
   if (description && description.length > 2000) throw new ValidationError("Description is too long");
 
+  const language = input.language === undefined ? "Hindi" : validateName(input.language, "Language");
+  const format = input.format === undefined
+    ? (input.type === EventType.MOVIE ? "2D" : "Live")
+    : validateName(input.format, "Format");
+  const genre = input.genre === undefined
+    ? (input.type === EventType.MOVIE ? "Cinema" : "Music")
+    : validateName(input.genre, "Genre");
+  const durationMinutes = input.durationMinutes === undefined
+    ? (input.type === EventType.MOVIE ? 150 : 180)
+    : Number(input.durationMinutes);
+  if (!Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 600) {
+    throw new ValidationError("Duration must be between 15 and 600 minutes");
+  }
+  const certificate = typeof input.certificate === "string" ? input.certificate.trim().toUpperCase() : undefined;
+  if (certificate && !/^[A-Z0-9+ -]{1,12}$/.test(certificate)) {
+    throw new ValidationError("Certificate must be 1 to 12 letters or numbers");
+  }
+
   return {
     title,
     type: input.type,
     description: description || undefined,
+    language,
+    format,
+    genre,
+    durationMinutes,
+    certificate: certificate || undefined,
     venueId: input.venueId,
     date: input.date,
     time: input.time,

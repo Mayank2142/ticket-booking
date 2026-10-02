@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
+import type { EventSalesSummaryDto, EventSummaryDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 import { formatEventDate } from "@/lib/presentation";
 
-type Event = { id: string; title: string; type: string; date: string; time: string; venue: { name: string } };
-type Summary = { totalBookings: number; revenue: number };
+type Event = EventSummaryDto;
+type Summary = Pick<EventSalesSummaryDto, "totalBookings" | "revenue">;
 
 export default function OrganiserEventsPage() {
   const [events, setEvents] = useState<Event[]>([]);

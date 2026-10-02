@@ -5,17 +5,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthGate } from "@/components/AuthGate";
 import { QrTicket } from "@/components/QrTicket";
+import type { BookingDto } from "@/contracts/api";
 import { api } from "@/lib/client";
 import { eventArtwork, formatEventDate } from "@/lib/presentation";
 
-type Booking = {
-  id: string;
-  ref: string;
-  status: string;
-  totalAmount: number;
-  event: { id: string; title: string; type: "MOVIE" | "CONCERT"; date: string; time: string; venue: { name: string } };
-  seats: { seat: { label: string } }[];
-};
+type Booking = BookingDto;
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<Booking[]>([]);

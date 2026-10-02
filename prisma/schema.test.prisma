@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma-test"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  ADMIN
+  ORGANISER
+  CUSTOMER
+}
+
+enum EventType {
+  MOVIE
+  CONCERT
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum WaitlistStatus {
+  WAITING
+  OFFERED
+  FULFILLED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      Role     @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  events    Event[]
+  bookings  Booking[]
+  waitlist  WaitlistEntry[]
+  heldSeats ShowSeat[] @relation("HeldBy")
+  favourites Favourite[]
+}
+
+model Venue {
+  id         String         @id @default(cuid())
+  name       String
+  city       String         @default("Delhi")
+  address    String?
+  auditorium String         @default("Main Auditorium")
+  rows       Int
+  cols       Int
+  createdAt  DateTime       @default(now())
+  categories SeatCategory[]
+  seats      Seat[]
+  events     Event[]
+}
+
+model Content {
+  id              String    @id @default(cuid())
+  identityKey     String    @unique
+  title           String
+  type            EventType
+  description     String?
+  language        String    @default("Hindi")
+  format          String    @default("2D")
+  genre           String    @default("Entertainment")
+  durationMinutes Int       @default(120)
+  certificate     String?
+  posterUrl       String?
+  createdAt       DateTime  @default(now())
+  shows      Event[]
+  favourites Favourite[]
+  @@index([type, language, genre])
+}
+
+model Favourite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  @@unique([userId, contentId])
+  @@index([userId, createdAt])
+}
+
+model SeatCategory {
+  id      String @id @default(cuid())
+  venueId String
+  venue   Venue  @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name    String
+  color   String @default("#6366f1")
+  seats    Seat[]
+  prices   CategoryPrice[]
+  waitlist WaitlistEntry[]
+}
+
+model Seat {
+  id         String       @id @default(cuid())
+  venueId    String
+  venue      Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   SeatCategory @relation(fields: [categoryId], references: [id])
+  row        Int
+  col        Int
+  label      String
+  showSeats    ShowSeat[]
+  bookingSeats BookingSeat[]
+  @@unique([venueId, row, col])
+}
+
+model Event {
+  id          String    @id @default(cuid())
+  organiserId String
+  organiser   User      @relation(fields: [organiserId], references: [id])
+  venueId     String
+  venue       Venue     @relation(fields: [venueId], references: [id])
+  contentId   String?
+  content     Content?  @relation(fields: [contentId], references: [id])
+  title       String
+  type        EventType
+  description String?
+  date        String
+  time        String
+  createdAt   DateTime  @default(now())
+  prices    CategoryPrice[]
+  showSeats ShowSeat[]
+  bookings  Booking[]
+  waitlist  WaitlistEntry[]
+  @@index([contentId, date, time])
+}
+
+model CategoryPrice {
+  id         String       @id @default(cuid())
+  eventId    String
+  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   SeatCategory @relation(fields: [categoryId], references: [id])
+  price      Float
+  @@unique([eventId, categoryId])
+}
+
+model ShowSeat {
+  id        String     @id @default(cuid())
+  eventId   String
+  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seatId    String
+  seat      Seat       @relation(fields: [seatId], references: [id])
+  status    SeatStatus @default(AVAILABLE)
+  heldUntil DateTime?
+  heldById  String?
+  heldBy    User?      @relation("HeldBy", fields: [heldById], references: [id])
+  version   Int        @default(0)
+  @@unique([eventId, seatId])
+}
+
+model Booking {
+  id                  String        @id @default(cuid())
+  userId              String
+  user                User          @relation(fields: [userId], references: [id])
+  eventId             String
+  event               Event         @relation(fields: [eventId], references: [id])
+  ref                 String        @unique
+  status              BookingStatus @default(CONFIRMED)
+  totalAmount         Float
+  ticketEmailSentAt   DateTime?
+  ticketEmailAttempts Int           @default(0)
+  createdAt           DateTime      @default(now())
+  seats BookingSeat[]
+}
+
+model BookingSeat {
+  id        String  @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  seatId    String
+  seat      Seat    @relation(fields: [seatId], references: [id])
+  @@unique([bookingId, seatId])
+}
+
+model WaitlistEntry {
+  id                        String         @id @default(cuid())
+  userId                    String
+  user                      User           @relation(fields: [userId], references: [id])
+  eventId                   String
+  event                     Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  categoryId                String
+  category                  SeatCategory   @relation(fields: [categoryId], references: [id])
+  position                  Int
+  status                    WaitlistStatus @default(WAITING)
+  offerToken                String?        @unique
+  offerExpiresAt            DateTime?
+  offeredSeatId             String?
+  offerNotifiedAt           DateTime?
+  offerNotificationAttempts Int            @default(0)
+  createdAt                 DateTime       @default(now())
+  @@unique([eventId, categoryId, userId])
+  @@unique([eventId, categoryId, position])
+  @@index([eventId, categoryId, status, position])
+}

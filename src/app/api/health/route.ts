@@ -1,10 +1,12 @@
 import { ok } from "@/lib/api";
-import { db } from "@/lib/db";
-
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  await db.$queryRaw`SELECT 1`;
-  const smtpConfigured = !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS);
-  return ok({ status: "ok", database: "connected", smtpConfigured, timestamp: new Date().toISOString() });
+  return ok({
+    status: "ok",
+    service: "cinebook-api",
+    version: process.env.BUILD_SHA ?? process.env.RAILWAY_GIT_COMMIT_SHA ?? "development",
+    uptimeSeconds: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
 }
