@@ -83,8 +83,9 @@ export function SeatMap({ rows, cols, seats, selected, prices, onToggle }: {
                       const isSelected = selected.includes(seat.seatId);
                       const disabled = seat.isBlocked || seat.status === "BOOKED" || seat.status === "UNAVAILABLE" || (seat.status === "HELD" && !seat.heldByMe);
                       const state = isSelected ? "selected" : seat.heldByMe ? "mine" : seat.status.toLowerCase();
+                      const stateLabel = seat.isBlocked ? "blocked" : state === "mine" ? "held by you" : state === "held" ? "held by another customer" : state;
                       const seatType = seat.seatType === "WHEELCHAIR" ? "Wheelchair-accessible space" : seat.seatType === "COMPANION" ? "Companion seat" : "Standard seat";
-                      const detailParts = [displaySeatLabel(seat.row, seat.col), seat.category.name, seatType, seat.viewLabel, seat.viewScore ? `view ${seat.viewScore} of 5` : null, seat.unavailableReason, state].filter(Boolean);
+                      const detailParts = [displaySeatLabel(seat.row, seat.col), seat.category.name, seatType, seat.viewLabel, seat.viewScore ? `view ${seat.viewScore} of 5` : null, seat.unavailableReason, stateLabel].filter(Boolean);
                       const details = detailParts.join(" · ");
                       return (
                         <button
@@ -100,7 +101,7 @@ export function SeatMap({ rows, cols, seats, selected, prices, onToggle }: {
                           data-seat-col={seat.col}
                           onKeyDown={(event) => moveFocus(event, seat.row, seat.col)}
                           onClick={() => onToggle(seat.seatId, seat.status)}
-                          className={`seat seat-${state} seat-type-${seat.seatType.toLowerCase()} ${seat.aisleAfter ? "seat-aisle" : ""}`}
+                          className={`seat seat-${state} seat-type-${seat.seatType.toLowerCase()} ${seat.isBlocked ? "seat-blocked" : ""} ${seat.aisleAfter ? "seat-aisle" : ""}`}
                         >
                           <span>{displaySeatLabel(seat.row, seat.col)}</span>
                           {seat.seatType === "WHEELCHAIR" && <small aria-hidden="true">♿</small>}
@@ -117,7 +118,7 @@ export function SeatMap({ rows, cols, seats, selected, prices, onToggle }: {
       </div>
       <p className="sr-only" role="status" aria-live="polite">{selected.length ? `${selected.length} seat${selected.length === 1 ? "" : "s"} selected.` : "No seats selected."}</p>
       <div className="seat-legend" aria-label="Seat status legend">
-        <span><i className="legend-available" />Available</span><span><i className="legend-held" />Held</span><span><i className="legend-booked" />Booked</span><span><i className="legend-unavailable" />Unavailable</span><span><i className="legend-selected" />Selected</span><span><b aria-hidden="true">♿</b>Accessible</span><span><b aria-hidden="true">C</b>Companion</span>
+        <span><i className="legend-available" />Available</span><span><i className="legend-selected" />Selected</span><span><i className="legend-held" />Held by another</span><span><i className="legend-mine" />Held by you</span><span><i className="legend-booked" />Booked</span><span><i className="legend-unavailable" />Unavailable</span><span><i className="legend-blocked" />Blocked</span><span><b aria-hidden="true">♿</b>Accessible</span><span><b aria-hidden="true">C</b>Companion</span>
       </div>
     </div>
   );

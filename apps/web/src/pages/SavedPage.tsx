@@ -1,8 +1,9 @@
 import type { EventSummaryDto } from "@cinebook/shared";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { EventCard } from "../components/EventCard";
 import { api } from "../lib/api";
+import { ButtonLink } from "../components/ui/Button";
+import { CustomerEmptyState, CustomerFeedback, CustomerLoading, CustomerPageHeading } from "./CustomerPageUI";
 
 export function SavedPage() {
   const [events, setEvents] = useState<EventSummaryDto[]>([]);
@@ -24,9 +25,9 @@ export function SavedPage() {
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Saved event could not be removed"); }
   }
 
-  return <section className="account-page saved-page">
-    <header className="page-heading"><div><p className="kicker">Your watchlist</p><h1>Saved events</h1><p>Movies and live events you saved for later.</p></div><Link className="button button-ghost" to="/search">Discover more</Link></header>
-    {error && <p className="form-message error" role="alert">{error}</p>}
-    {loading ? <div className="event-skeleton" /> : events.length ? <div className="movie-showcase-grid">{events.map((event) => <EventCard key={event.id} event={event} onFavourite={remove} />)}</div> : <div className="empty-bookings"><span>♡</span><h2>Nothing saved yet</h2><p>Use the heart or Save button on an event, then find it here.</p><Link className="button button-primary" to="/search">Browse events</Link></div>}
+  return <section className="customer-space saved-page">
+    <CustomerPageHeading eyebrow="Your watchlist" title="Saved events" description="Movies and live events you saved for later." action={<ButtonLink variant="secondary" to="/search">Discover more</ButtonLink>} />
+    {error && <CustomerFeedback error>{error}</CustomerFeedback>}
+    {loading ? <CustomerLoading label="Loading saved events…" /> : events.length ? <div className="movie-showcase-grid">{events.map((event) => <EventCard key={event.id} event={event} onFavourite={remove} />)}</div> : error ? <CustomerEmptyState error title="Saved events unavailable" description="Your saved events could not be loaded. Please try again later." /> : <CustomerEmptyState title="Nothing saved yet" description="Use the heart or Save button on an event, then find it here." action={<ButtonLink to="/search">Browse events</ButtonLink>} />}
   </section>;
 }

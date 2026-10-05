@@ -26,6 +26,8 @@ test("login updates the navigation immediately and favourites remain interactive
 
   const add = page.getByRole("button", { name: /Add Dune: Part Two to favourites/i }).first();
   const remove = page.getByRole("button", { name: /Remove Dune: Part Two from favourites/i }).first();
+  // The account header can render before the authenticated catalogue finishes loading.
+  await expect(add.or(remove)).toBeVisible();
   if (await add.isVisible().catch(() => false)) {
     await add.click();
     await expect(remove).toBeVisible();

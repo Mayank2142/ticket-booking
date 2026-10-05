@@ -5,6 +5,8 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import "./styles.css";
 import "./cinematic.css";
+import "./design-system/tokens.css";
+import "./design-system/foundation.css";
 
 // Keep the dev server's HMR graph fresh after dependency re-optimization.
 

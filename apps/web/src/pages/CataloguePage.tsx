@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { EventCard } from "../components/EventCard";
 import { api } from "../lib/api";
+import { MoviesDiscoveryView } from "./MoviesDiscoveryView";
 
 const emptyOptions: DiscoveryOptionsDto = { cities: [], genres: [], venues: [], languages: [], formats: [] };
 
@@ -68,6 +69,8 @@ export function CataloguePage({ type }: { type?: EventType }) {
   }
 
   function clearFilters() { setSearchParams({}, { replace: true }); }
+
+  if (isMovie || isLive) return <MoviesDiscoveryView catalogueType={isLive ? "CONCERT" : "MOVIE"} events={events} options={options} pagination={pagination} loading={loading} error={error} filters={{ q: query, city, date, language, format, genre, venue, sort }} setFilter={setFilter} clearFilters={clearFilters} setPage={setPage} onFavourite={user?.role === "CUSTOMER" ? toggleFavourite : undefined} />;
 
   return (
     <div className="catalogue-page">

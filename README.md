@@ -1,30 +1,24 @@
-<div align="center">
-
 # CineBook
 
-### Fair, concurrency-safe ticket booking for movies and concerts
+A React + Node.js booking application for movies and live events, with visual seat selection, temporary holds, fair waitlists and QR tickets.
 
-<img src="public/images/cinebook-stitch-home.png" alt="CineBook Cinematic Precision discovery experience" width="900" />
+[Screenshots](#product-preview) · [Start locally](#local-setup) · [Project structure](#project-structure) · [Tests](#testing) · [Architecture](#architecture)
 
-[![Node API](https://img.shields.io/badge/Node.js%20API-22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma)](https://www.prisma.io/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
-[![Redis](https://img.shields.io/badge/Redis-5.x-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Tests](https://img.shields.io/badge/tests-33%20API%20%2B%2012%20E2E-22c55e)](#testing)
-[![Branch](https://img.shields.io/badge/branch-Mayank-6366f1)](https://github.com/Mayank2142/ticket-booking/tree/Mayank)
+## Features
 
-Premium event discovery · visual seat selection · expiring holds · fair waitlist offers · QR email tickets
+| Area | Workflows |
+|---|---|
+| Discovery | Movies and Live Events, search, city/date/language/format/genre/venue filters, sorting, pagination, favourites and recommendations |
+| Booking | Showtimes, category pricing, accessible seats, live inventory, expiring holds, review, confirmation and QR tickets |
+| Customer | Upcoming/previous/cancelled tickets, booking details, cancellation, saved content, waitlist history/offers, profile, preferences and account security |
+| Organiser | Owned content/show management, batch shows, lifecycle controls, inventory, attendees, filtered reports and confirmed-booking CSV export |
+| Administrator | Cities, venues, auditoriums, users/roles, platform shows/bookings, statistics, jobs, email previews/retries and audit history |
 
-[Preview](#product-preview) · [Features](#features) · [Design](#how-the-hard-parts-work) · [Setup](#local-setup) · [API](#api-reference) · [Deploy](#railway-deployment)
-
-</div>
-
----
+The frontend shares light/dark tokens and reusable components. Movies and Live Events share the same discovery layout. Checkout confirms reservations: no real payment gateway, ticket transfer or mobile-wallet integration is provided.
 
 ## Product preview
 
-The responsive interface follows one cinematic system from discovery to confirmation: poster-led event cards, live seat states, a curved screen map, sticky checkout summaries, downloadable QR passes, graceful loading/error/empty states, and mobile-first navigation. The artwork in `public/images` is original project artwork generated for CineBook—no third-party film posters or logos are bundled.
+The gallery contains ten committed screenshots across both themes and all three roles. Local demo posters and artwork are in `public/images`. Titles, venues and screenings are sample content—not real cinema inventory. Check artwork rights before public use.
 
 ### Customer discovery in dark and light mode
 
@@ -55,411 +49,290 @@ The responsive interface follows one cinematic system from discovery to confirma
 | <img src="output/playwright/readme/09-organiser-dark.jpg" alt="Organiser performance and listing dashboard in dark mode" width="100%" /> | <img src="output/playwright/readme/10-admin-light.jpg" alt="Administrator operations dashboard in light mode" width="100%" /> |
 | Owned listings, lifecycle controls, confirmed bookings and revenue | Platform statistics, users, venues, shows, jobs, email and audit operations |
 
-All screenshots above are captured from the local React application at a 1440 × 900 viewport using seeded demo data. They document both supported themes and the customer, organiser and administrator experiences.
+These ten photos are earlier local UI snapshots, retained as documentation—not fresh captures of every latest redesign. Current frontend source is in `apps/web/src`.
 
-## At a glance
+## Local setup
 
-| Evaluation area | Implementation | Evidence |
-|---|---|---|
-| Seat hold and TTL | Configurable transactional holds plus lazy and scheduled expiry | `src/lib/seats.ts`, cleanup route, integration test 2 |
-| Concurrency protection | Conditional state transitions inside database transactions | Integration tests 1, 3 and 6 |
-| Waitlist allocation | FIFO category queues, atomic offer claims and single-use tokens | Integration tests 3–6 |
-| Time-limited offers | Dedicated offered seat, expiry timestamp, token validation and automatic cascade | Offer API and integration tests 4–5 |
-| Real-time seat map | SSE invalidation with Redis cross-instance fan-out and polling recovery | `ShowSeat`, stream route, `SeatMap.tsx` |
-| QR and email | Booking-reference QR attachment with durable SMTP retry tracking | `qrcode`, Nodemailer, delivery service |
-| Role-based workflows | Customer, organiser and admin pages backed by JWT role checks | Protected pages and API routes |
+Requirements: **Node.js 22.x**, npm and Git. The easiest local demo uses SQLite; PostgreSQL, Docker, Redis and a real email account are optional.
 
-### Booking lifecycle
+### 1. Download and install
 
-```mermaid
-flowchart LR
-    A[Browse event] --> B[Select visual seats]
-    B --> C[Atomic temporary hold]
-    C --> D[Checkout before TTL]
-    D --> E[Confirmed booking]
-    E --> F[Email + QR ticket]
-    C -->|abandoned| G[Automatic release]
-    E -->|cancelled| H[Next waitlist offer]
-    H -->|accepted in time| E
-    H -->|expired| I[Next customer]
+```bash
+git clone https://github.com/Mayank2142/ticket-booking.git
+cd ticket-booking
+npm ci
 ```
 
-## Why this project is different
+Copy the environment template. Windows PowerShell:
 
-Most booking demos stop at a seat grid. CineBook combines a polished booking journey with the failure-case handling that matters when demand is high:
+```powershell
+Copy-Item .env.example .env
+```
 
-- **Atomic seat transitions:** a conditional database update must affect exactly one row before a hold or booking succeeds.
-- **Materialised show inventory:** every event owns a `ShowSeat` snapshot, so the same venue can safely host many shows.
-- **Dual expiry:** abandoned holds and stale offers are released both lazily during seat-map reads and proactively by a dedicated worker.
-- **Resilient live updates:** Redis fans out inventory invalidations across API instances; SSE refreshes browsers without making Redis the source of truth.
-- **Fair cancellation recovery:** a cancelled seat is reserved for the first waiting customer in its category, with a single-use expiring token.
-- **Offer bypass prevention:** a seat reserved by the waitlist cannot be held or booked without its matching token.
-- **Atomic fulfillment:** booking the offered seat and changing `OFFERED → FULFILLED` happen in one transaction.
-- **Resilient email delivery:** booking success never becomes booking failure because SMTP is unavailable; undelivered messages are tracked and retried.
-- **Layout safety:** admins may fully create, edit, and delete flexible venue layouts, but layouts are locked once events depend on them.
-- **Catalogue-aware discovery:** reusable content groups showtimes while city, auditorium, language, format, genre, duration, and certificate metadata power filters and comparisons.
-- **Taste signals:** customer favourites and booking history drive explainable genre/language recommendations, with booking popularity as the public fallback.
+macOS/Linux:
 
-## Features
+```bash
+cp .env.example .env
+```
 
-| Role | Capabilities |
+### 2. Configure the local demo
+
+Edit these entries in `.env`, retaining the remaining defaults:
+
+```dotenv
+DATABASE_URL="file:./dev.db"
+JWT_SECRET="replace-with-a-long-unique-local-secret"
+CRON_SECRET="replace-with-another-unique-local-secret"
+APP_URL="http://localhost:5173"
+WEB_URL="http://localhost:5173"
+ALLOWED_ORIGINS="http://localhost:5173"
+REDIS_URL=
+SMTP_HOST=
+SMTP_USER=
+SMTP_PASS=
+READINESS_REQUIRE_SMTP=false
+```
+
+Replace the secret placeholders. Never commit `.env`, credentials or database files. Blank SMTP credentials enable **local email previews**, not external delivery.
+
+### 3. Create the demo database and start
+
+Run from the repository root:
+
+```bash
+npm run db:generate
+npm run db:deploy:sqlite
+npm run db:seed
+npm run demo:movies
+npm run dev
+```
+
+Open **[http://localhost:5173](http://localhost:5173)**. Keep this terminal running: it starts React/Vite on **5173** and the API on **3000**.
+
+Use `db:seed` for the initial **demo database**, not a live database with customer bookings. `demo:movies` adds future screenings for seeded Interstellar, Kalki 2898 AD, Dune: Part Two and Oppenheimer when older screenings have passed. It leaves historical bookings and existing seat locks unchanged.
+
+### 4. Start background work
+
+Open a second terminal in the same project directory:
+
+```bash
+npm run worker:start
+```
+
+Keep it running for proactive hold/offer expiry, notifications and retries. Both processes read the root `.env`. Stop each with `Ctrl+C` in its terminal.
+
+API checks: [health](http://localhost:3000/api/health) and [readiness](http://localhost:3000/api/ready).
+
+### Demo accounts
+
+| Role | Email | Password |
+|---|---|---|
+| Customer | `customer@demo.com` | `password123` |
+| Organiser | `organiser@demo.com` | `password123` |
+| Administrator | `admin@demo.com` | `password123` |
+
+Browse publicly, then log in as a customer to select seats, review and confirm. Open My Tickets for the QR ticket or cancellation. Use organiser/admin accounts to explore their portals. These are **local demo credentials only**: never expose them on a production deployment.
+
+### Optional: PostgreSQL
+
+Install PostgreSQL 16+, create an empty `cinebook` database and update `.env` with your credentials:
+
+```dotenv
+DATABASE_URL="postgresql://postgres:YOUR_PASSWORD@localhost:5432/cinebook?schema=public"
+```
+
+Use the PostgreSQL migration command instead of SQLite:
+
+```bash
+npm run db:generate
+npm run db:deploy
+npm run db:seed
+npm run demo:movies
+npm run dev
+```
+
+Start the worker separately. Use PostgreSQL for production or multi-worker booking traffic; SQLite is a local/test convenience.
+
+### Optional: Redis and real email
+
+- With Docker running, `npm run redis:up` starts Redis. Set `REDIS_URL=redis://127.0.0.1:6379`, restart API/worker and run `npm run redis:diagnostics`. Stop with `npm run redis:down`.
+- Without SMTP, branded HTML/text emails are saved in the database. Sign in as the administrator and inspect Operations for previews and jobs.
+- For external delivery, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and a verified `SMTP_FROM`. Run `npm run email:verify`, then restart services. No email account or SMTP credentials are bundled.
+
+### Run the compiled application
+
+After database setup:
+
+```bash
+npm run build
+npm start
+```
+
+Stop the development API first to free port 3000. Open [http://localhost:3000](http://localhost:3000): the API serves the compiled React SPA. Keep the worker running separately. Startup does not automatically migrate or seed the database.
+
+### Troubleshooting
+
+| Problem | Check |
 |---|---|
-| Customer | Register/login, search and filter events, open rich event details, view live seats, hold/book seats, receive/download QR tickets, join category waitlists, view ticket history, cancel bookings |
-| Organiser | Register/login, create movie or concert listings, choose venue/date/time, set per-category pricing, view aggregate bookings and revenue reports |
-| Admin | Create arbitrary seat categories, assign category rows and colours, edit/delete unused venues, create events, inspect protected layouts |
-
-Platform capabilities:
-
-- Configurable hold and waitlist-offer TTLs
-- Available / selected / held / booked visual seat states with live SSE updates and a 30-second recovery poll
-- Responsive poster discovery, event hero, checkout, confirmation, ticket-wallet, and dashboard screens
-- City and language discovery, grouped showtime comparison, favourites, and personalised recommendations
-- Maximum ten seats per checkout with duplicate selection rejection
-- Booking references encoded as attached PNG QR tickets
-- Dedicated maintenance worker, protected cron fallback, and durable email retry state
-- Validation for users, events, prices, categories, colours, rows, dates, and seat IDs
-- Separate liveness and dependency-aware readiness endpoints for safe deployment checks
-- Redis-backed rate limits with a bounded in-process fallback, request IDs, allowlisted CORS, CSP, HSTS, and structured JSON logs
-- Thirty lifecycle, concurrency, catalogue, jobs, notification, query-validation, and security tests plus twelve Playwright role journeys
-
-## Technology
-
-| Layer | Choice | Purpose |
-|---|---|---|
-| Frontend | React 18 + Vite + React Router | Standalone customer experience and production bundle |
-| API | Node.js 22 HTTP service | Framework-independent JSON/SSE API and React build server |
-| Language | TypeScript 5 | End-to-end type safety |
-| Styling | CSS design system | Shared dark/light visual language across customer and operations routes |
-| Data | Prisma 7 + PostgreSQL | Production relational store, serializable transactions, and pooled connections |
-| Catalogue | Reusable `Content` + scheduled `Event` shows | Multi-show titles, metadata, favourites, and recommendations |
-| Coordination | Redis Pub/Sub + Server-Sent Events | Cross-instance invalidation and browser live updates |
-| Authentication | JWT + bcryptjs | Role-based API and page protection |
-| Email | Nodemailer SMTP | Booking and waitlist notifications |
-| Tickets | `qrcode` | PNG QR attachment encoding the booking reference |
-| Scheduling | Dedicated Node worker + protected cron fallback | Releases holds/offers and retries email |
-| Testing | Node test runner + Playwright | Integration, concurrency, security, accessibility, and customer-journey coverage |
-
-## Architecture
-
-> **Local architecture:** The React + Vite application owns every browser route. A standalone Node HTTP service owns the JSON/SSE API and can serve the compiled React application. See [docs/LOCAL_IMPLEMENTATION_PLAN.md](docs/LOCAL_IMPLEMENTATION_PLAN.md) for complete, partial, and remaining local product work.
-
-> **Scale foundation:** Phases 5–8 add PostgreSQL concurrency, Redis/SSE invalidation, a dedicated worker, catalogue/recommendation foundations, rate limiting, request tracing, security headers, readiness checks, and browser-level regression tests. External Railway/SMTP/Redis verification remains separate from local implementation.
-
-```mermaid
-flowchart LR
-    REACT[React + Vite application] --> API[Node.js HTTP API]
-    API -- SSE --> REACT
-    API --> AUTH[JWT role checks]
-    API --> CORE[Seat and waitlist state machine]
-    CORE --> DB[(Prisma + PostgreSQL)]
-    CORE --> MAIL[Nodemailer + QR]
-    CORE -. invalidation .-> REDIS[(Redis Pub/Sub)]
-    REDIS -. fan-out .-> API
-    WORKER[Maintenance worker] --> CORE
-    CRON[Protected cron fallback] --> CORE
-    REACT -. safety poll .-> API
-```
-
-## How the hard parts work
-
-### Seat hold and booking
-
-```text
-AVAILABLE --conditional hold--> HELD --held by same customer + unexpired--> BOOKED
-    ^                            |
-    |-------- TTL cleanup -------|
-```
-
-Each requested seat is updated with a status condition. If another request changed the row first, the affected-row count is zero and the entire transaction fails. Booking repeats the guard with `status = HELD`, the customer ID, and `heldUntil > now`. PostgreSQL runs these high-contention flows at `SERIALIZABLE` isolation and retries Prisma `P2034` write conflicts up to three times.
-
-### Cancellation and waitlist
-
-```text
-WAITING --atomic queue claim--> OFFERED --token booking--> FULFILLED
-                                 |
-                                 +-- TTL expiry --> EXPIRED --> next WAITING customer
-```
-
-Cancellation first changes `CONFIRMED → CANCELLED` conditionally, making repeat requests harmless. The next queue member and freed seat are claimed in the same transaction. Queue positions are unique per event/category, and an offered seat requires its exact token. Expiry conditionally marks the offer expired, releases only the matching customer hold, and cascades to the next person.
-
-### Email and QR delivery
-
-The QR contains only the unique booking reference. SMTP success timestamps are stored on bookings/offers. If SMTP is missing or temporarily fails, the booking still returns success, the UI reports that email is queued, and cleanup retries pending delivery up to five times.
-
-### Security and operations
-
-- Auth, registration, seat holds, booking, cancellation, waitlists, and favourites have scoped fixed-window limits. Redis coordinates counters across instances; the bounded memory fallback protects a single instance during local development or Redis failure.
-- API requests receive an `X-Request-ID`; security-sensitive failures and readiness errors use structured JSON logs without passwords, tokens, or raw identities.
-- CORS reflects only `WEB_URL`, `APP_URL`, or explicitly listed `ALLOWED_ORIGINS`. CSP, frame denial, MIME sniffing protection, referrer policy, permissions policy, COOP, and production HSTS are set at the edge.
-- `/api/health` is a lightweight liveness probe. `/api/ready` checks PostgreSQL, configured Redis, and—when `READINESS_REQUIRE_SMTP=true`—SMTP configuration before a deployment receives traffic.
-- Direct security upgrades and compatible Prisma CLI transitive patches are pinned through the lockfile; the production dependency audit reports zero known vulnerabilities.
-
-For the concise design discussion required by the assignment, see [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+| “Failed to fetch” / catalogue cannot load | Keep `npm run dev` running and check API health on 3000. Vite proxies `/api` to that port; remove stale custom `VITE_API_URL` overrides. |
+| Movies list is empty | Clear filters, check API readiness, then run `npm run demo:movies` after the initial seed. |
+| Missing Prisma client or tables | Run `db:generate`, then migrations for the chosen database profile. |
+| Port 3000 or 5173 is occupied | Stop your previous project instance in its own terminal before starting another. |
+| Emails are not delivered | Blank SMTP means local previews only. Inspect the admin inbox or configure/verify SMTP. |
+| Expiry/jobs do not run proactively | Start `npm run worker:start` in the second terminal with the same `.env`. |
 
 ## Project structure
 
 ```text
 ticket-booking/
 ├── apps/
-│   ├── web/                     # Complete standalone React + Vite frontend
-│   └── worker/                  # Hold/offer expiry and email retry process
-├── packages/
-│   └── shared/                  # Framework-independent API contracts
+│   ├── api/src/
+│   │   ├── server.ts             # HTTP entry; API and compiled SPA serving
+│   │   ├── router.ts             # API route dispatch
+│   │   ├── cluster.ts            # Optional multi-process API
+│   │   └── routes/               # Auth, events, bookings, account and role APIs
+│   ├── web/
+│   │   ├── index.html            # Browser entry and favicon
+│   │   ├── vite.config.ts        # Build and development API proxy
+│   │   └── src/
+│   │       ├── App.tsx           # React routes
+│   │       ├── main.tsx          # Bootstrap and shared stylesheet imports
+│   │       ├── auth/             # Session context and protected routes
+│   │       ├── components/       # Header, footer, logo, seats and posters
+│   │       │   └── ui/           # Shared buttons, cards, badges and inputs
+│   │       ├── design-system/    # Light/dark tokens and foundation styles
+│   │       ├── pages/            # Customer, organiser and admin screens
+│   │       └── lib/              # Browser API client and presentation helpers
+│   └── worker/src/index.ts       # Expiry, durable jobs and delivery retries
+├── packages/shared/src/         # Shared TypeScript contracts
+├── src/lib/                     # Database, auth, seats, jobs, email and services
 ├── prisma/
-│   ├── migrations-postgresql/   # Production PostgreSQL migrations
-│   ├── migrations/              # SQLite-only regression migrations
-│   ├── schema.prisma            # Production PostgreSQL model
-│   ├── schema.test.prisma       # Isolated SQLite test profile
-│   └── seed.ts                  # Demo users, venue, seats, and event
+│   ├── schema.prisma            # PostgreSQL model
+│   ├── schema.test.prisma       # SQLite local/test model
+│   ├── migrations-postgresql/   # PostgreSQL migrations
+│   ├── migrations/              # SQLite migrations
+│   └── seed.ts                  # Demo users, content, venues and inventory
 ├── scripts/
-│   ├── invoke-cleanup.ts        # Production cron entry point
-│   ├── run-tests.mjs            # Disposable test DB + migration runner
-│   ├── run-postgres-tests.mjs   # Guarded PostgreSQL concurrency runner
-│   ├── migrate-sqlite-to-postgres.ts # One-time ID-preserving data copy
-│   └── verify-email.ts          # SMTP connection check
-├── src/
-│   ├── app/
-│   │   ├── api/                 # Auth, venues, events, seats, bookings, waitlist, cron
-│   │   ├── admin/               # Flexible venue management
-│   │   ├── organiser/           # Event creation and revenue dashboard
-│   │   └── events/              # Customer event and seat-map experience
-│   ├── components/              # Navigation, event cards, seat map, QR ticket, footer
-│   └── lib/                     # Auth, DB, validation, seats, presentation, delivery, email, QR
-├── public/images/               # Original hero and poster artwork
+│   ├── dev-local.mjs            # Start API + React together
+│   ├── refresh-demo-movies.ts   # Add upcoming seeded movie screenings
+│   ├── run-tests.mjs            # Disposable SQLite test runner
+│   ├── run-postgres-tests.mjs   # Guarded PostgreSQL tests
+│   ├── load-test.mjs            # Public-read capacity harness
+│   ├── check-redis.ts           # Redis diagnostics
+│   ├── verify-email.ts          # SMTP connectivity check
+│   └── migrate-sqlite-to-postgres.ts # One-time data migration
+├── public/images/               # Local posters, heroes and branding
+├── output/playwright/readme/    # Ten documentation screenshots
 ├── tests/
 │   ├── booking-lifecycle.test.ts
 │   ├── catalog.test.ts
 │   ├── realtime.test.ts
 │   ├── security.test.ts
-│   └── e2e/customer.spec.ts     # Production-build browser journeys
-├── playwright.config.ts         # API + React preview test orchestration
-├── proxy.ts                     # Request IDs and allowlisted API CORS
-├── .env.example
-├── railway.json
-├── railway.worker.json
-└── SYSTEM_DESIGN.md
+│   ├── jobs-notifications.test.ts
+│   ├── scaling.test.ts
+│   └── e2e/                    # Customer, management and quality journeys
+├── prisma.config.ts             # PostgreSQL CLI configuration
+├── prisma.test.config.ts        # SQLite CLI configuration
+├── playwright.config.ts         # Browser-test orchestration
+├── compose.redis.yml            # Optional local Redis container
+├── .env.example                 # Copy to ignored .env
+├── package.json                 # Workspace scripts and dependencies
+├── SYSTEM_DESIGN.md
+└── docs/LOCAL_IMPLEMENTATION_PLAN.md
 ```
 
-## Local setup
+### Key files
 
-Requirements: Node.js 22, npm, and PostgreSQL 16+ for the production profile.
+| File | Responsibility |
+|---|---|
+| [App.tsx](apps/web/src/App.tsx) | Browser routes |
+| [tokens.css](apps/web/src/design-system/tokens.css), [foundation.css](apps/web/src/design-system/foundation.css) | Shared themes, colours, spacing and base styles |
+| [SiteHeader.tsx](apps/web/src/components/SiteHeader.tsx), [SiteFooter.tsx](apps/web/src/components/SiteFooter.tsx) | Shared navigation and footer |
+| [HomePage.tsx](apps/web/src/pages/HomePage.tsx) | Home discovery and recommendations |
+| [CataloguePage.tsx](apps/web/src/pages/CataloguePage.tsx), [MoviesDiscoveryView.tsx](apps/web/src/pages/MoviesDiscoveryView.tsx) | Catalogue behaviour and Movies/Live Events presentation |
+| [EventPage.tsx](apps/web/src/pages/EventPage.tsx) | Details, showtimes and seat/checkout orchestration |
+| [seats.ts](src/lib/seats.ts) | Transactional holds, booking and waitlist allocation |
+| [email.ts](src/lib/email.ts), [email-templates.ts](src/lib/email-templates.ts) | Transport, previews and notification templates |
+| [schema.prisma](prisma/schema.prisma) | Data model; keep SQLite schema/migrations in sync when changing it |
+| [.env.example](.env.example) | Runtime configuration template |
 
-```bash
-git clone https://github.com/Mayank2142/ticket-booking.git
-cd ticket-booking
-npm ci
-cp .env.example .env
-# Create the local `cinebook` PostgreSQL database, then update DATABASE_URL.
-npm run db:deploy
-npm run db:seed
-npm run dev
+## Architecture
+
+| Layer | Technology |
+|---|---|
+| Frontend | React 18, Vite, React Router, TypeScript and shared CSS tokens |
+| API | Node.js HTTP service with JSON APIs and Server-Sent Events |
+| Database | Prisma 7 + PostgreSQL; optional SQLite local/test profile |
+| Coordination | Optional Redis Pub/Sub and rate-limit counters |
+| Identity | JWT sessions, bcrypt hashing and server-side role checks |
+| Jobs | Independent worker and durable database job records |
+| Notifications | Nodemailer, HTML/text templates, previews and QR attachments |
+| Tests | Node test runner and Playwright |
+
+React owns browser routes; the API owns `/api` and can serve the compiled SPA. Inventory uses **SSE, not WebSockets**. Redis carries invalidations, not authoritative booking state.
+
+```mermaid
+flowchart LR
+    WEB[React frontend] --> API[Node HTTP API]
+    API -- SSE --> WEB
+    API --> DB[(Prisma database)]
+    API -. optional fan-out .-> REDIS[(Redis)]
+    WORKER[Maintenance worker] --> DB
+    WORKER --> MAIL[SMTP or local preview]
 ```
 
-On Windows PowerShell, replace the copy command with:
+Content groups reusable metadata; Show records own scheduled inventory/prices. Public endpoints retain `/api/events` naming. Conditional updates within transactions check seat ownership, expiry and offer tokens. PostgreSQL serializable transactions and bounded conflict retries protect competing requests.
 
-```powershell
-Copy-Item .env.example .env
-```
+Cancellation reallocates eligible inventory to category waitlists. Offers expire and cascade; customers cannot bypass another customer's token. Jobs persist attempts, next-run times and failure reasons to recover after restart. Email failures do not undo confirmed bookings.
 
-`npm run dev` starts the API on port 3000 and the React/Vite application on port 5173. Open [http://localhost:5173](http://localhost:5173). The homepage, event detail, and live seat map are public; authentication is requested only when a customer holds, books, joins a waitlist, or opens their tickets.
-
-For a dependency-light local fallback only, set `DATABASE_URL=file:./dev.db`, run `npm run db:deploy:sqlite`, then `npm run db:seed`. Production and Railway must use PostgreSQL.
-
-### Five-minute demo path
-
-1. Sign in as the demo customer.
-2. Open **Dune: Part Two** (or any seeded showcase event), choose seats and continue to checkout.
-3. Confirm the booking and download the generated QR pass.
-4. Open **My bookings** to see the ticket wallet and cancellation action.
-5. Sign in as the organiser to inspect booking totals and revenue.
-6. Sign in as the admin to create or edit an unused venue and its category rows.
-
-### Demo accounts
-
-| Role | Email | Password |
-|---|---|---|
-| Admin | `admin@demo.com` | `password123` |
-| Organiser | `organiser@demo.com` | `password123` |
-| Customer | `customer@demo.com` | `password123` |
-
-### Environment variables
-
-| Variable | Required | Description |
-|---|---:|---|
-| `DATABASE_URL` | Yes | Direct PostgreSQL connection string used by Prisma and the `pg` adapter |
-| `DB_POOL_MAX` | Recommended | Maximum PostgreSQL pool size; default `10` |
-| `DB_CONNECT_TIMEOUT_MS` | Recommended | Connection acquisition timeout; default `5000` |
-| `DB_IDLE_TIMEOUT_MS` | Recommended | Idle pooled-connection timeout; default `10000` |
-| `API_WORKERS` | Scale-out | Cluster worker count; defaults to the smaller of four or the available CPU count |
-| `API_MAX_IN_FLIGHT` | Recommended | Per-worker overload limit; excess work receives a retryable `503` |
-| `PUBLIC_CACHE_TTL_MS` | Recommended | Short public catalogue cache and request-coalescing window; default `5000` |
-| `SOURCE_DATABASE_URL` | Migration only | Existing SQLite file used only by the one-time copy command |
-| `JWT_SECRET` | Yes | Long random JWT signing secret |
-| `SEAT_HOLD_TTL_MINUTES` | Yes | Checkout hold duration; default `10` |
-| `WAITLIST_OFFER_TTL_MINUTES` | Yes | Offer duration; default `15` |
-| `CRON_SECRET` | Yes | Protects cleanup API calls |
-| `APP_URL` | Yes | Public origin used in offer links |
-| `WEB_URL` | Production | Public React origin allowed to call the API |
-| `ALLOWED_ORIGINS` | Optional | Additional comma-separated HTTPS origins allowed by CORS |
-| `REDIS_URL` | Scale-out | Cross-instance SSE fan-out and distributed rate-limit counters |
-| `READINESS_REQUIRE_SMTP` | Recommended | Set `true` when production must reject traffic without SMTP configuration |
-| `BUILD_SHA` | Recommended | Release identifier returned by liveness checks |
-| `SMTP_HOST` | Production | SMTP hostname |
-| `SMTP_PORT` | Production | Usually `587` or `465` |
-| `SMTP_SECURE` | Production | `true` for implicit TLS/port 465 |
-| `SMTP_USER`, `SMTP_PASS` | Production | SMTP credentials |
-| `SMTP_FROM` | Production | Verified sender address |
-
-Never commit `.env`. Verify production SMTP before launch:
-
-```bash
-npm run email:verify
-```
+See [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) and [the implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for deeper context.
 
 ## Commands
 
-```bash
-npm run dev            # Development server
-npm run dev:api        # Node API on port 3000
-npm run dev:web        # React + Vite frontend on port 5173
-npm run start:scale    # Run the API with multiple local Node workers
-npm run build          # Prisma generation + React build + type checking
-npm run build:web      # Type-check and build the React frontend
-npm run lint           # ESLint flat-config validation
-npm run typecheck      # TypeScript validation
-npm run typecheck:web  # React frontend TypeScript validation
-npm test               # Thirty-three isolated API/domain/security/scaling tests
-npm run test:postgres  # Same suite against TEST_DATABASE_URL (*_test only)
-npm run test:e2e       # Twelve Chromium role/accessibility journeys
-npm run test:load      # Staged 10,000-arrival local capacity test
-npm run email:verify   # Verify configured SMTP credentials
-npm run redis:up       # Start the optional local Redis container
-npm run redis:diagnostics # Show Redis configuration and connectivity
-npm run redis:down     # Stop the local Redis container
-npm run cron:cleanup   # Invoke the deployed cleanup endpoint once
-npm run worker:start  # Run continuous expiry and delivery maintenance
-npm run db:deploy      # Apply committed migrations
-npm run db:deploy:sqlite # Optional local SQLite fallback only
-npm run db:seed        # Add demo data
-npm run db:migrate:sqlite # One-time SQLite → PostgreSQL data copy
-```
+| Command | Purpose |
+|---|---|
+| `npm run dev` | Start API + Vite together |
+| `npm run dev:api` / `npm run dev:web` | Start either service separately |
+| `npm run worker:start` | Background maintenance and delivery |
+| `npm run db:generate` | Generate PostgreSQL and SQLite Prisma clients |
+| `npm run db:deploy` / `npm run db:deploy:sqlite` | Migrate the chosen database profile |
+| `npm run db:seed` | Initialise local demo data |
+| `npm run demo:movies` | Add future movie screenings without rewriting history |
+| `npm run build` | Generate clients, build React and check TypeScript |
+| `npm start` | Serve API + compiled SPA |
+| `npm run typecheck` | Backend/shared and frontend TypeScript checks |
+| `npm run lint` | ESLint checks |
+| `npm test` | Isolated API/domain regression suite |
+| `npm run test:e2e` | Chromium role/quality journeys |
+| `npm run test:postgres` | Suite against a separate PostgreSQL test database |
+| `npm run test:load` | Public-read capacity harness |
+| `npm run start:scale` | Optional multi-process API |
+| `npm run redis:up`, `npm run redis:down`, `npm run redis:diagnostics` | Optional Redis setup/diagnostics |
+| `npm run email:verify` | Check configured SMTP |
 
 ## Testing
 
-`npm test` creates a disposable SQLite database for fast local regression. `npm run test:postgres` applies the production migrations to `TEST_DATABASE_URL` and runs the identical suite; for safety it refuses any database whose name does not end in `_test`. `npm run test:e2e` starts the production API and React preview, then exercises the customer experience in Chromium. The local worker persists jobs before processing them, recovers interrupted work after restart, and stores rendered HTML/text email previews when SMTP is not configured. Administrators can inspect both from the Operations section. Coverage includes:
-
-1. Simultaneous holds and bookings produce exactly one winner.
-2. Expired checkout holds return to `AVAILABLE`.
-3. Concurrent cancellation produces one state change and one offer.
-4. Missing/wrong offer tokens cannot book reserved seats.
-5. Successful offer booking atomically fulfills the queue entry.
-6. Expired offers cascade and concurrent offers select distinct customers.
-7. Inventory invalidations are isolated to the matching event.
-8. Unsubscribed live listeners receive no later events.
-9. The SSE route emits correctly framed ready and inventory events.
-10. Equivalent listings resolve to the same catalogue identity.
-11. Language, format, genre, duration, and certificate metadata are validated.
-12. Venue city and auditorium identity is validated with the seat layout.
-13. Catalogue metadata cannot overwrite a scheduled show ID.
-14. Rate limits block requests after the configured allowance.
-15. Rate-limit buckets remain isolated by scope and customer/IP identity.
-16. `429` responses expose retry metadata without leaking private identifiers.
-17. Durable jobs preserve attempts, recover interrupted work, and schedule exponential retries.
-18. Every notification template renders HTML and plain text and is saved to the local preview inbox.
-19. Catalogue pagination and filter queries reject invalid or out-of-range values.
-
-Playwright additionally verifies customer, organiser, and administrator journeys; light-mode readability; 320/390px responsive layouts; mobile city selection; dialog focus restoration; seat-map keyboard navigation; image fallbacks; and duplicate-ID or unnamed-control regressions.
-
-### Local capacity test
-
-Build first, then run the clustered API and the load harness in separate PowerShell terminals:
-
-```powershell
+```bash
 npm run build
-$env:NODE_ENV="production"; npm run start:scale
-npm run test:load
+npm test
+npx playwright install chromium
+npm run test:e2e
 ```
 
-The harness sends 10,000 simultaneous arrivals through a bounded 2,000-socket pool and fails when any response errors or p95 exceeds five seconds. Override `LOAD_TEST_URL`, `LOAD_TEST_USERS`, `LOAD_TEST_SOCKETS`, `LOAD_TEST_MAX_P95_MS`, or `LOAD_TEST_MAX_ERROR_RATE` to test another profile. It targets public catalogue and health reads; authenticated booking correctness remains covered separately by the transactional concurrency suite.
+The build includes frontend and backend/shared TypeScript validation. Core tests create a disposable SQLite database. Playwright starts the API and React preview and uses role fixtures; do not point tests at live customer databases.
 
-The scaled API uses one worker per configured process, short-lived public-read caching with single-flight miss coalescing, immutable caching for fingerprinted assets, sampled access logs, bounded in-flight work, tuned keep-alive settings, PostgreSQL pooling, and optional Redis coordination. Use PostgreSQL for multi-worker booking traffic; SQLite remains a convenience profile for local development and read-only capacity experiments.
+Coverage includes competing holds/bookings, expiry, cancellation/offer races, token ownership, pagination/query validation, SSE framing, security, job recovery/retries and notification previews. Browser checks cover customer/organiser/admin journeys, mobile city selection, themes, keyboard/focus behaviour, image fallbacks and responsive layouts.
 
-## API reference
+For PostgreSQL testing, configure a separate `TEST_DATABASE_URL`; the runner refuses database names that do not end in `_test`.
 
-| Method | Endpoint | Access | Purpose |
-|---|---|---|---|
-| POST | `/api/auth/register` | Public | Customer/organiser registration |
-| POST | `/api/auth/login` | Public | JWT login |
-| GET | `/api/auth/me` | Authenticated | Current profile |
-| GET / POST | `/api/venues` | Public / Admin | List or create venues |
-| GET / PUT / DELETE | `/api/venues/:id` | Public / Admin | Read, replace, or remove unused venue |
-| GET / POST | `/api/events` | Public / Organiser | Browse or create events |
-| GET | `/api/events/:id` | Public | Event detail and prices |
-| GET / POST | `/api/favourites` | Customer | Read or toggle content favourites |
-| GET | `/api/recommendations` | Public | Personalised or popularity-ranked discovery |
-| GET / POST | `/api/events/:id/seats` | Public / Customer | Live map or atomic seat hold |
-| GET | `/api/events/:id/stream` | Public | SSE inventory invalidation stream |
-| POST | `/api/events/:id/book` | Customer | Confirm held seats and queue QR email |
-| GET / POST | `/api/events/:id/waitlist` | Customer | View/join category queue |
-| GET | `/api/events/:id/waitlist/offer?token=` | Token | Validate time-limited offer |
-| GET | `/api/bookings` | Customer | Booking history |
-| DELETE | `/api/bookings/:id` | Customer | Idempotent cancellation and reallocation |
-| GET | `/api/organiser/events/:id/summary` | Owner/Admin | Bookings and revenue |
-| GET / POST | `/api/cron/release-holds` | Cron secret | Expiry sweep and email retry |
-| GET | `/api/health` | Public | Process liveness, uptime, version, and build identifier |
-| GET | `/api/ready` | Public | Database/Redis readiness and optional SMTP configuration gate |
+### Capacity testing
 
-Errors use `{ "error": "message" }`; successful responses are JSON objects named for their resource.
+Build first, start `npm run start:scale` against a local PostgreSQL database, then run `npm run test:load` in another terminal. The harness models 10,000 arrivals through a bounded socket pool against public catalogue/health reads. Configure `LOAD_TEST_URL`, `LOAD_TEST_USERS`, `LOAD_TEST_SOCKETS`, `LOAD_TEST_MAX_P95_MS` and `LOAD_TEST_MAX_ERROR_RATE` for your machine.
 
-## Database model
+This is **not a guarantee of 10,000 simultaneous authenticated booking users or zero lag**. Capacity depends on hardware, database and traffic mix; booking correctness is tested separately. Do not load test external systems without permission.
 
-- `Venue → SeatCategory → Seat` stores a city/auditorium-labelled physical layout.
-- `Content → Event` separates reusable movie/concert metadata from scheduled showtimes.
-- `User → Favourite → Content` stores customer taste signals independently of a specific showtime.
-- `Event → CategoryPrice` stores a scheduled listing and per-category prices.
-- `Event → ShowSeat` materialises live per-show status and hold ownership/expiry.
-- `Booking → BookingSeat` stores immutable booking reference, amount, and selected seats.
-- `WaitlistEntry` stores a unique queue position, status, offer token, expiry, and offered seat.
-- `BackgroundJob` persists maintenance and notification work with attempts, retry timing, and failure reasons; `EmailPreview` stores local HTML/text output when SMTP is absent.
+## Deployment notes
 
-The complete source of truth is [prisma/schema.prisma](prisma/schema.prisma).
+No hosted demo URL is promised here. Production needs PostgreSQL, strong secrets, HTTPS, correct `APP_URL`/`WEB_URL`/CORS origins, migrations and a separately running worker. Add Redis for cross-instance coordination and verified SMTP for external delivery. Remove public demo credentials and review artwork rights before launch.
 
-## Railway deployment
-
-> **Public deployment:** pending redeployment. The former Railway domain currently returns `Application not found`; do not submit it as a live demo until the checklist below passes.
-
-| Production component | Status |
-|---|---|
-| Web/API code | Production builds and E2E pass locally; Railway service/domain must be recreated |
-| Database | PostgreSQL schema, migrations, pooling, and CI profile implemented; managed instance verification pending |
-| Health check | `railway.json` uses dependency-aware `/api/ready`; liveness remains `/api/health` |
-| Hold/offer cleanup | `railway.worker.json` and five-minute `railway.cron.json` fallback are committed; scheduling verification pending |
-| Real-time fan-out | Redis Pub/Sub and distributed limits implemented; managed Redis verification pending |
-| SMTP delivery | Durable retry code is complete; verified production credentials and end-to-end delivery remain pending |
-
-Configure the PostgreSQL deployment as follows:
-
-1. Create a Railway project from the public GitHub `main` branch.
-2. Add Railway PostgreSQL and reference its direct `DATABASE_URL` from the web service. A persistent application volume is no longer required.
-3. If preserving the existing SQLite deployment, first apply PostgreSQL migrations, set `SOURCE_DATABASE_URL` temporarily to an accessible SQLite snapshot, and run `npm run db:migrate:sqlite`. The copier requires an empty target and preserves every primary key and booking reference.
-4. Add Railway Redis and reference its `REDIS_URL` from both web and worker services. Without it, one API process still has local SSE fan-out and every browser keeps a 30-second safety refresh.
-5. Add all required variables from `.env.example`; use strong unique values for `JWT_SECRET` and `CRON_SECRET`.
-6. Generate public domains. Set `APP_URL` to the API origin, `WEB_URL` to the React origin, and `ALLOWED_ORIGINS` to the exact allowed HTTPS origins before redeploying. The API start command applies production migrations first.
-7. Keep the configured deployment health check at `/api/ready`; use `/api/health` only for liveness monitoring.
-8. Create a second always-on Railway service from the same repo, select `railway.worker.json`, and share `DATABASE_URL`, `REDIS_URL`, SMTP, TTL, and `WORKER_INTERVAL_MS` variables.
-9. Optionally retain `railway.cron.json` as a recovery sweep scheduled for `*/5 * * * *`; it calls the same idempotent maintenance service.
-10. Configure SMTP, run `npm run email:verify`, then make a real booking and waitlist cancellation.
-11. Run the public smoke test: `/api/health`, `/api/ready`, login, hold/release, booking email, cancellation offer, and offer expiry cascade. Only then restore a **Live demo** link at the top of this README.
-
-Railway supports a minimum cron interval of five minutes. Seat-map reads also enforce expiry, so visible stale holds do not wait for cron. See the official [PostgreSQL](https://docs.railway.com/guides/postgresql), [cron](https://docs.railway.com/cron-jobs), and [health-check](https://docs.railway.com/deployments/healthchecks) documentation.
-
-### Production scaling note
-
-PostgreSQL is the production system of record. Conditional updates remain the compare-and-swap guard, while serializable transactions and bounded conflict retries protect multi-row seat and waitlist flows across horizontally scaled API instances. Redis carries only ephemeral invalidation signals, so Redis downtime cannot create or lose a booking. The worker operates on durable PostgreSQL state and can safely resume after a restart. SQLite is retained only as an optional local/test profile.
-
-
----
-
-<div align="center">
-Built as a full-stack ticket allocation system, not just a seat-picker demo.
-</div>
+Readiness is `/api/ready`; liveness is `/api/health`. Configured Redis and optional `READINESS_REQUIRE_SMTP` affect readiness. `.env.example` documents pooling, hold/offer durations, retry scheduling and scaling. Never publish `.env`, database files, tokens or SMTP secrets.

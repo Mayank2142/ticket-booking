@@ -46,6 +46,7 @@
     "db:setup:sqlite": "npm run db:deploy:sqlite",
     "db:migrate:sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "demo:movies": "tsx scripts/refresh-demo-movies.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {

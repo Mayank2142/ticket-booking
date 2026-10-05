@@ -1,0 +1,274 @@
+/* Home only — adapted from the paired Stitch Home screens. */
+.home-page {
+  --home-purple: var(--color-primary);
+  --home-purple-text: #c4b5fd;
+  --home-info-text: #67e8f9;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding-top: var(--space-6);
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+html[data-theme="light"] .home-page {
+  --home-purple-text: #6d28d9;
+  --home-info-text: #0e7490;
+}
+
+.home-page *,
+.home-page *::before,
+.home-page *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+.home-page svg { width: 20px; height: 20px; flex: 0 0 auto; }
+.home-page h1, .home-page h2, .home-page h3 { margin: 0; font-family: var(--font-display); letter-spacing: -.02em; }
+.home-page h2 { font-size: var(--text-headline-xl); line-height: var(--text-headline-xl-line); }
+.home-page h3 { font-size: var(--text-headline-md); line-height: var(--text-headline-md-line); }
+.home-page p { margin: 0; }
+.home-page .ui-button { font-size: 13px; font-weight: 600; white-space: nowrap; }
+.home-page .ui-button--small { font-size: 12px; }
+.home-page .ui-card { background: var(--color-surface); color: var(--color-text); border-color: var(--color-border); }
+.home-page .ui-badge { min-height: 23px; font-size: 11px; font-weight: 600; letter-spacing: 0; border: 0; }
+.home-page .home-format-badge { color: var(--home-info-text); background: color-mix(in srgb, var(--color-tertiary) 14%, var(--color-surface)); }
+.home-page .home-eyebrow { margin-bottom: 8px; color: var(--home-purple-text); font-size: 11px; font-weight: 700; letter-spacing: .07em; line-height: 1.5; text-transform: uppercase; }
+.home-page .home-eyebrow--info { color: var(--home-info-text); }
+
+/* Featured experience: card content on the left, cinematic artwork on the right. */
+.home-feature { display: grid; grid-template-columns: 1.4fr 1fr; min-height: 460px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.home-feature__content { padding: 32px; display: flex; flex-direction: column; min-width: 0; }
+.home-feature__badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.home-feature__language { color: var(--color-text-muted); font-size: 12px; }
+.home-page .home-feature h1 { margin-bottom: 12px; color: var(--color-text-strong); font-size: var(--text-display-lg); line-height: var(--text-display-lg-line); }
+.home-feature__description { max-width: 580px; color: var(--color-text-muted); font-size: 16px; line-height: 1.6; }
+.home-feature__shows { margin: 20px 0 24px; }
+.home-feature__shows > p { margin-bottom: 8px; color: var(--color-text-subtle); font-size: 12px; }
+.home-feature__shows > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.home-feature__shows a { padding: 6px 8px; color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-high); font-size: 12px; }
+.home-feature__shows a:hover { border-color: var(--color-primary); }
+.home-feature__shows a span { color: var(--color-text-muted); }
+.home-feature__actions { margin-top: auto; padding-top: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--color-border); }
+.home-feature__assurance { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 11px; }
+.home-feature__assurance svg { width: 16px; height: 16px; color: var(--home-info-text); }
+.home-feature__art { position: relative; min-width: 0; min-height: 100%; background: #11131c; }
+.home-feature__art > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; object-position: center; }
+.home-page .home-feature__art-label { position: absolute; top: 16px; right: 16px; color: #f8fafc; background: rgba(15, 23, 42, .82); }
+
+/* The quick links use only the entertainment types already supported. */
+.home-categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 24px 0 16px; }
+.home-categories > a, .home-categories > button { display: flex; align-items: center; gap: 12px; padding: 12px; min-width: 0; color: var(--color-text); text-align: left; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); cursor: pointer; }
+.home-categories > :is(a, button):hover, .home-categories > button[aria-pressed="true"] { border-color: var(--color-primary); }
+.home-category-icon { width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto; color: var(--home-purple-text); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--color-primary) 15%, var(--color-surface)); }
+.home-categories > :first-child .home-category-icon { color: #fff; background: var(--color-primary); }
+.home-categories strong { display: block; font-size: 14px; font-weight: 600; }
+.home-categories small { display: block; margin-top: 3px; color: var(--color-text-subtle); font-size: 11px; }
+.home-categories > a > span:last-child { margin-left: auto; color: var(--color-text-subtle); }
+.home-page .home-discovery { padding: 16px; border-radius: var(--radius-md); }
+.home-discovery__grid { display: grid; grid-template-columns: minmax(220px, 1.7fr) minmax(130px, .9fr) minmax(140px, .85fr) auto; align-items: end; gap: 12px; scroll-margin-top: 100px; }
+.home-control { min-width: 0; display: grid; gap: 7px; }
+.home-control > span { color: var(--color-text-muted); font-size: 12px; font-weight: 600; }
+.home-control--search > div { position: relative; }
+.home-control--search svg { position: absolute; left: 12px; top: 12px; color: var(--color-text-subtle); }
+.home-control--search .ui-input { padding-left: 40px; }
+.home-page :is(.ui-input, .ui-select) { height: 44px; min-height: 44px; font-size: 13px; font-family: var(--font-body); color: var(--color-text); border-color: var(--color-border-strong); background: var(--color-surface-low); color-scheme: dark; }
+html[data-theme="light"] .home-page :is(.ui-input, .ui-select) { color-scheme: light; background: var(--color-surface-low); }
+.home-page :is(.ui-input, .ui-select):focus { border-color: var(--color-focus); }
+.home-discovery__filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.home-discovery__filters > span { margin-right: 4px; color: var(--color-text-subtle); font-size: 12px; }
+.home-discovery__filters button { min-height: 32px; padding: 5px 10px; color: var(--color-text-muted); font-size: 12px; font-weight: 500; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-low); cursor: pointer; }
+.home-discovery__filters button.active { color: var(--home-purple-text); border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface)); }
+.home-discovery__filters .ui-select { width: auto; min-width: 150px; height: 32px; min-height: 32px; margin-left: auto; font-size: 12px; }
+
+/* Movie and recommendation cards */
+.home-section { margin-top: 40px; scroll-margin-top: 130px; }
+.home-section__heading { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; }
+.home-section__description { display: flex; align-items: center; gap: 6px; margin-top: 8px !important; color: var(--color-text-muted); font-size: 13px; }
+.home-section__description svg { width: 16px; height: 16px; color: var(--home-info-text); }
+.home-section__link { display: inline-flex; align-items: center; gap: 8px; padding-block: 6px; color: var(--home-purple-text); font-size: 13px; font-weight: 600; }
+.home-section__link:hover { text-decoration: underline; }
+.home-movie-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+.home-page .home-event-card { min-width: 0; padding: 0; overflow: hidden; border-radius: var(--radius-md); }
+.home-event-card__poster { position: relative; padding: 12px 12px 0; }
+.home-event-card__poster > a { position: relative; display: block; aspect-ratio: 2 / 3; overflow: hidden; border-radius: var(--radius-sm); background: var(--color-surface-low); }
+.home-event-card__poster img { width: 100%; height: 100%; object-fit: cover; }
+.home-event-card__poster .home-format-badge { position: absolute; top: 8px; left: 8px; max-width: calc(100% - 16px); color: #fff; background: #155e75; }
+.home-event-card__body { padding: 12px; }
+.home-event-card__schedule { display: flex; align-items: center; gap: 5px; margin-bottom: 8px; color: var(--color-text-muted); font-size: 11px; }
+.home-event-card__schedule svg { width: 14px; height: 14px; color: var(--home-info-text); }
+.home-page .home-event-card h3 { min-height: 48px; font-size: 16px; line-height: 24px; overflow-wrap: anywhere; }
+.home-event-card__body > p { min-height: 36px; margin-top: 4px; color: var(--color-text-muted); font-size: 12px; line-height: 18px; }
+.home-event-card__venue { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; margin-top: 8px; }
+.home-event-card__venue > span { color: var(--color-text-subtle); font-size: 11px; }
+.home-event-card__venue .ui-badge { white-space: nowrap; font-size: 10px; }
+.home-event-card__footer { margin-top: 12px; padding-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid var(--color-border); }
+.home-event-card__footer > span { display: grid; gap: 3px; }
+.home-event-card__footer small { color: var(--color-text-subtle); font-size: 11px; }
+.home-event-card__footer strong { color: var(--color-text-strong); font-size: 14px; font-variant-numeric: tabular-nums; }
+.home-favourite { position: absolute; top: 20px; right: 20px; z-index: 2; width: 36px; height: 36px; display: grid; place-items: center; padding: 0; color: #fff; border: 1px solid rgba(255, 255, 255, .3); border-radius: var(--radius-sm); background: rgba(15, 23, 42, .85); cursor: pointer; }
+.home-favourite svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+.home-favourite.active { color: #fda4af; }
+.home-favourite.active svg { fill: currentColor; }
+.home-favourite:hover { border-color: #fff; }
+
+/* Concert feature and supporting event rows */
+.home-concert-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 20px; }
+.home-concert-feature { position: relative; display: flex; align-items: end; min-height: 420px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: #11131c; }
+.home-concert-feature > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; object-position: center; }
+.home-concert-feature__shade { position: absolute; inset: 0; background: linear-gradient(0deg, #11131c 3%, rgba(17, 19, 28, .94) 20%, rgba(17, 19, 28, .1) 78%); }
+.home-concert-feature__badges { position: absolute; top: 16px; left: 16px; display: flex; flex-wrap: wrap; gap: 8px; max-width: calc(100% - 72px); }
+.home-concert-feature__copy { position: relative; width: 100%; padding: 24px; color: #fff; }
+.home-concert-feature__copy > p:first-child { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; color: #ddd6fe; font-size: 12px; }
+.home-concert-feature__copy > p:first-child svg { width: 16px; height: 16px; }
+.home-page .home-concert-feature__copy h3 { color: #fff; font-size: 30px; line-height: 1.25; }
+.home-concert-feature__copy > p:not(:first-child) { margin-top: 8px; color: #d4d4df; font-size: 12px; }
+.home-concert-feature__actions { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-top: 20px; }
+.home-concert-feature__actions > span { display: grid; gap: 4px; }
+.home-concert-feature__actions small { color: #c7c4d7; font-size: 11px; }
+.home-concert-feature__actions strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.home-concert-side { min-width: 0; display: grid; align-content: start; gap: 16px; }
+.home-page .home-concert-row { min-width: 0; padding: 16px; display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 16px; }
+.home-concert-row > img { width: 112px; height: 138px; object-fit: cover; border-radius: var(--radius-sm); }
+.home-concert-row__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.home-concert-row__meta small { color: var(--color-text-subtle); font-size: 11px; }
+.home-page .home-concert-row h3 { font-size: 16px; line-height: 23px; }
+.home-concert-row p { margin-top: 5px; color: var(--color-text-muted); font-size: 12px; }
+.home-concert-row__actions { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.home-concert-row__actions strong { font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Venue information is derived from the existing show catalogue. */
+.home-venues { padding-top: 32px; border-top: 1px solid var(--color-border); }
+.home-venue-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.home-page .home-venue-card { padding: 20px; display: flex; flex-direction: column; }
+.home-venue-card__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.home-venue-card__top svg { color: var(--home-info-text); }
+.home-venue-card > p { margin-top: 8px; color: var(--color-text-muted); font-size: 13px; }
+.home-venue-card__formats { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+.home-venue-card__formats small { color: var(--color-text-subtle); font-size: 11px; }
+.home-venue-card__formats > div { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.home-venue-card__footer { margin-top: auto; padding-top: 16px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+.home-venue-card__footer > span { color: var(--color-text-subtle); font-size: 11px; }
+
+/* Reassurance panel and the existing email-alert subscription. */
+.home-reservations { margin-top: 40px; padding: 32px; display: grid; grid-template-columns: 1.25fr 1fr; align-items: center; gap: 40px; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: linear-gradient(120deg, var(--color-surface), color-mix(in srgb, var(--color-primary) 7%, var(--color-surface))); }
+.home-reservations h2 { margin-top: 16px; }
+.home-reservations > div:first-child > p { margin-top: 16px; color: var(--color-text-muted); font-size: 14px; line-height: 1.7; }
+.home-reservations__benefits { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 24px; }
+.home-reservations__benefits > div { padding: 12px; display: grid; align-content: start; gap: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); }
+.home-reservations__benefits svg { color: var(--home-purple-text); }
+.home-reservations__benefits strong { font-size: 12px; }
+.home-reservations__benefits span { color: var(--color-text-subtle); font-size: 11px; line-height: 1.5; }
+.home-page .home-seat-preview { padding: 20px; border-radius: var(--radius-lg); box-shadow: var(--shadow-popover); }
+.home-seat-preview__header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.home-seat-preview__header strong { font-size: 16px; }
+.home-seat-preview__screen { width: 82%; height: 16px; margin: 28px auto 4px; border-top: 3px solid var(--color-primary); border-radius: 50%; }
+.home-seat-preview > small { display: block; color: var(--color-text-subtle); font-size: 11px; text-align: center; }
+.home-seat-preview__grid { max-width: 275px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 20px auto 16px; }
+.home-seat-preview__grid > span { aspect-ratio: 1.1; display: grid; place-items: center; color: var(--color-text-muted); border: 1px solid var(--color-border-strong); border-radius: var(--radius-xs); background: var(--color-surface-high); font-size: 10px; }
+.home-seat-preview__grid > span.selected { color: #fff; border-color: var(--color-primary); background: var(--color-primary); }
+.home-seat-preview__grid > span.booked { opacity: .35; }
+.home-seat-preview > p { margin: 0 0 16px; color: var(--color-text-subtle); text-align: center; font-size: 11px; }
+.home-page .home-alerts { margin-top: 32px; padding: 24px; display: grid; grid-template-columns: 1.15fr 1fr; align-items: center; gap: 24px; }
+.home-alerts h2 { font-size: 22px; }
+.home-alerts > div > p:last-child { margin-top: 8px; color: var(--color-text-muted); font-size: 13px; }
+.home-alerts form { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.home-alerts__notice { grid-column: 1 / -1; color: var(--home-info-text); font-size: 13px; }
+.home-page .home-status { margin: 24px auto; padding: 32px; text-align: center; }
+.home-status > svg { width: 28px; height: 28px; margin-bottom: 12px; color: var(--home-purple-text); }
+.home-status h2 { font-size: 22px; }
+.home-status p { margin-top: 8px; color: var(--color-text-muted); }
+.home-skeleton > div, .home-skeleton > span { display: block; border-radius: var(--radius-md); background: var(--color-surface-high); }
+.home-skeleton > div { aspect-ratio: 2 / 3; }
+.home-skeleton > span { height: 14px; width: 75%; margin-top: 14px; }
+.home-skeleton > span:last-child { width: 50%; }
+
+@media (max-width: 1023px) {
+  .home-feature { grid-template-columns: 1.1fr 1fr; min-height: 420px; }
+  .home-feature__content { padding: 24px; }
+  .home-feature__assurance { width: 100%; }
+  .home-feature__description { font-size: 14px; }
+  .home-categories { gap: 8px; }
+  .home-categories > a, .home-categories > button { gap: 8px; padding: 10px; }
+  .home-categories strong { font-size: 12px; }
+  .home-categories small { font-size: 10px; }
+  .home-category-icon { width: 32px; height: 32px; }
+  .home-discovery__grid { grid-template-columns: 1.4fr 1fr; }
+  .home-movie-grid { gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-concert-grid { grid-template-columns: 1fr; }
+  .home-concert-feature { min-height: 420px; }
+  .home-concert-side { grid-template-columns: 1fr 1fr; }
+  .home-page .home-concert-row { grid-template-columns: 80px minmax(0, 1fr); padding: 12px; gap: 12px; }
+  .home-concert-row > img { width: 80px; height: 120px; }
+  .home-venue-grid { gap: 12px; }
+  .home-page .home-venue-card { padding: 16px; }
+  .home-reservations { grid-template-columns: 1fr 1fr; padding: 24px; gap: 24px; }
+  .home-reservations__benefits { grid-template-columns: 1fr; }
+  .home-reservations__benefits > div { grid-template-columns: auto 1fr; gap: 4px 12px; }
+  .home-reservations__benefits svg { grid-row: span 2; }
+  .home-alerts form { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 767px) {
+  .home-page { padding-top: 16px; }
+  .home-feature { grid-template-columns: 1fr; min-height: 0; }
+  .home-feature__art { grid-row: 1; height: 200px; min-height: 0; }
+  .home-feature__content { padding: 20px; }
+  .home-feature__badges { gap: 6px; margin-bottom: 12px; }
+  .home-feature__description { font-size: 14px; }
+  .home-feature__actions { gap: 8px; padding-top: 16px; }
+  .home-feature__shows { margin: 16px 0 20px; }
+  .home-feature__shows a { font-size: 11px; }
+  .home-feature__assurance { margin-top: 4px; }
+  .home-categories { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+  .home-categories > a, .home-categories > button { min-height: 64px; }
+  .home-categories strong { font-size: 12px; }
+  .home-categories small { font-size: 11px; }
+  .home-categories > a > span:last-child { display: none; }
+  .home-page .home-discovery { padding: 12px; }
+  .home-discovery__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .home-control--search, .home-discovery__grid > .ui-button { grid-column: 1 / -1; }
+  .home-page .ui-button { min-height: 44px; }
+  .home-feature__actions > .ui-button { min-height: 48px; }
+  .home-discovery__filters > span { width: 100%; }
+  .home-discovery__filters .ui-select { width: 100%; margin: 4px 0 0; }
+  .home-section { margin-top: 32px; }
+  .home-section__heading { margin-bottom: 16px; align-items: start; gap: 8px; }
+  .home-page h2 { font-size: 24px; line-height: 32px; }
+  .home-section__description { font-size: 12px; }
+  .home-section__link { font-size: 12px; }
+  .home-movie-grid { gap: 12px; }
+  .home-event-card__poster { padding: 8px 8px 0; }
+  .home-event-card__poster .home-format-badge { top: 6px; left: 6px; padding: 4px 5px; min-height: 20px; font-size: 10px; }
+  .home-event-card__body { padding: 10px; }
+  .home-event-card__schedule { flex-wrap: wrap; gap: 4px; font-size: 10px; }
+  .home-page .home-event-card h3 { min-height: 44px; font-size: 14px; line-height: 22px; }
+  .home-event-card__body > p { font-size: 11px; min-height: 54px; }
+  .home-event-card__venue { align-items: start; flex-direction: column; }
+  .home-event-card__footer { flex-wrap: wrap; gap: 10px; }
+  .home-event-card__footer .ui-button { width: 100%; }
+  .home-favourite { width: 32px; height: 32px; top: 14px; right: 14px; }
+  .home-concert-feature { min-height: 380px; }
+  .home-concert-feature__copy { padding: 20px; }
+  .home-page .home-concert-feature__copy h3 { font-size: 26px; }
+  .home-concert-feature__actions { gap: 12px; }
+  .home-concert-side { grid-template-columns: 1fr; gap: 12px; }
+  .home-page .home-concert-row { grid-template-columns: 80px minmax(0, 1fr); }
+  .home-concert-row > img { height: 115px; }
+  .home-page .home-concert-row h3 { font-size: 15px; }
+  .home-concert-row__actions .ui-button { min-height: 38px; }
+  .home-venue-grid { grid-template-columns: 1fr; }
+  .home-reservations { grid-template-columns: 1fr; padding: 20px; gap: 24px; margin-top: 32px; }
+  .home-page .home-seat-preview { padding: 16px; }
+  .home-page .home-alerts { grid-template-columns: 1fr; padding: 20px; gap: 16px; margin-top: 24px; }
+  .home-alerts form { grid-template-columns: 1fr; }
+  .home-page .home-alerts h2 { font-size: 22px; line-height: 30px; }
+}
+
+@media (max-width: 359px) {
+  .home-feature__content { padding: 16px; }
+  .home-feature__actions > .ui-button { width: 100%; }
+  .home-movie-grid { gap: 8px; }
+  .home-event-card__body { padding: 8px; }
+  .home-concert-feature__actions { align-items: start; flex-direction: column; }
+  .home-concert-feature__actions .ui-button { width: 100%; }
+}
