@@ -6,6 +6,12 @@
 
 A React + Node.js booking application for movies and live events, with visual seat selection, temporary holds, fair waitlists and QR tickets.
 
+## Live demo
+
+**[Open CineBook on Railway](https://ticket-booking-production-dd12.up.railway.app)**
+
+The deployed demo includes sample movies/events and demo accounts. It is not a real paid-ticket service. Email delivery is not enabled yet; Railway Trial blocks outbound SMTP.
+
 [Screenshots](#product-preview) · [What makes it different](#what-makes-cinebook-different) · [Start locally](#local-setup) · [Project structure](#project-structure) · [Tech stack](#architecture) · [Tests](#testing) · [Routes](#application-routes)
 
 ## Features
