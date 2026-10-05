@@ -12,7 +12,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-5.x-DC382D?logo=redis&logoColor=white)](https://redis.io/)
 [![Tests](https://img.shields.io/badge/tests-33%20API%20%2B%2012%20E2E-22c55e)](#testing)
-[![Branch](https://img.shields.io/badge/branch-main-6366f1)](https://github.com/Mayank2142/ticket-booking/tree/main)
+[![Branch](https://img.shields.io/badge/branch-Mayank-6366f1)](https://github.com/Mayank2142/ticket-booking/tree/Mayank)
 
 Premium event discovery · visual seat selection · expiring holds · fair waitlist offers · QR email tickets
 
@@ -25,6 +25,37 @@ Premium event discovery · visual seat selection · expiring holds · fair waitl
 ## Product preview
 
 The responsive interface follows one cinematic system from discovery to confirmation: poster-led event cards, live seat states, a curved screen map, sticky checkout summaries, downloadable QR passes, graceful loading/error/empty states, and mobile-first navigation. The artwork in `public/images` is original project artwork generated for CineBook—no third-party film posters or logos are bundled.
+
+### Customer discovery in dark and light mode
+
+| Dark mode | Light mode |
+|---|---|
+| <img src="output/playwright/readme/01-home-dark.jpg" alt="CineBook home and discovery experience in dark mode" width="100%" /> | <img src="output/playwright/readme/02-home-light.jpg" alt="CineBook home and discovery experience in light mode" width="100%" /> |
+| **Movie discovery** — poster-led cards and live availability | **Live-event catalogue** — searchable, filterable event browsing |
+| <img src="output/playwright/readme/03-movies-dark.jpg" alt="CineBook movie discovery cards in dark mode" width="100%" /> | <img src="output/playwright/readme/04-live-events-light.jpg" alt="CineBook live-events catalogue in light mode" width="100%" /> |
+
+### Event booking journey
+
+| Event details | Accessible seat selection |
+|---|---|
+| <img src="output/playwright/readme/05-event-detail-dark.jpg" alt="Dune event details with realtime inventory in dark mode" width="100%" /> | <img src="output/playwright/readme/06-seat-map-light.jpg" alt="Keyboard-accessible auditorium seat map in light mode" width="100%" /> |
+| Rich metadata, ticket categories, realtime availability and booking CTA | Category pricing, hold status, fare summary, accessible and unavailable seats |
+
+### Customer account
+
+| My Tickets | Profile and preferences |
+|---|---|
+| <img src="output/playwright/readme/07-my-tickets-light.jpg" alt="Customer My Tickets page with QR pass in light mode" width="100%" /> | <img src="output/playwright/readme/08-account-dark.jpg" alt="Customer profile, preferences and security controls in dark mode" width="100%" /> |
+| Upcoming, previous and cancelled bookings with QR access | Identity, email verification, reminders, password and account controls |
+
+### Organiser and administrator workspaces
+
+| Organiser studio | Administrator operations |
+|---|---|
+| <img src="output/playwright/readme/09-organiser-dark.jpg" alt="Organiser performance and listing dashboard in dark mode" width="100%" /> | <img src="output/playwright/readme/10-admin-light.jpg" alt="Administrator operations dashboard in light mode" width="100%" /> |
+| Owned listings, lifecycle controls, confirmed bookings and revenue | Platform statistics, users, venues, shows, jobs, email and audit operations |
+
+All screenshots above are captured from the local React application at a 1440 × 900 viewport using seeded demo data. They document both supported themes and the customer, organiser and administrator experiences.
 
 ## At a glance
 
