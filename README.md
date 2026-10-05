@@ -1,8 +1,12 @@
-# CineBook
+# 🎟️ CineBook
+
+### Discover the show. Choose your seat. Keep your place.
+
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black) ![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white) ![Node.js](https://img.shields.io/badge/Node.js-22-339933?logo=nodedotjs&logoColor=white) ![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16+-4169E1?logo=postgresql&logoColor=white)
 
 A React + Node.js booking application for movies and live events, with visual seat selection, temporary holds, fair waitlists and QR tickets.
 
-[Screenshots](#product-preview) · [Start locally](#local-setup) · [Project structure](#project-structure) · [Tests](#testing) · [Architecture](#architecture)
+[Screenshots](#product-preview) · [What makes it different](#what-makes-cinebook-different) · [Start locally](#local-setup) · [Project structure](#project-structure) · [Tech stack](#architecture) · [Tests](#testing) · [Routes](#application-routes)
 
 ## Features
 
@@ -49,7 +53,36 @@ The gallery contains ten committed screenshots across both themes and all three 
 | <img src="output/playwright/readme/09-organiser-dark.jpg" alt="Organiser performance and listing dashboard in dark mode" width="100%" /> | <img src="output/playwright/readme/10-admin-light.jpg" alt="Administrator operations dashboard in light mode" width="100%" /> |
 | Owned listings, lifecycle controls, confirmed bookings and revenue | Platform statistics, users, venues, shows, jobs, email and audit operations |
 
-These ten photos are earlier local UI snapshots, retained as documentation—not fresh captures of every latest redesign. Current frontend source is in `apps/web/src`.
+These ten photos were freshly captured from the current local application at a 1440 × 1000 desktop viewport on 6 October 2026 (Asia/Kolkata), using demo accounts and data. Current frontend source is in `apps/web/src`.
+
+## What makes CineBook different
+
+The novelty is the combination of a coherent customer experience with failure-aware ticket allocation—not a claim that seat locking or queues are new inventions.
+
+| Design choice | Why it matters |
+|---|---|
+| **Per-show inventory snapshots** | One venue layout supports many screenings without sharing their seat availability or prices. |
+| **Atomic holds and confirmation** | Database conditions validate ownership, hold expiry and seat state; two competing customers cannot both win the same seat. |
+| **Fair, single-use waitlist offers** | Cancellation can reserve a seat for the next eligible category queue member rather than exposing it to a free-for-all. |
+| **Expiry with recovery** | A worker releases abandoned holds and expired offers; reads also enforce expiry. Durable jobs recover interrupted work. |
+| **Live updates without Redis dependency** | SSE refreshes inventory; optional Redis fans invalidations across instances while the database remains authoritative. Safety polling provides recovery. |
+| **Inspectable notifications** | HTML/text templates, local previews, delivery attempts and retries let developers verify emails without a real email account. |
+| **Operational visibility** | Organisers manage only their owned listings; admins inspect jobs, retries, inventory and audit history without opening the database. |
+| **Shared visual language** | Theme tokens, reusable controls and customer-page patterns keep discovery, seats, tickets and settings consistent. |
+
+### From discovery to admission
+
+```mermaid
+flowchart LR
+    A[Discover a show] --> B[Choose seats]
+    B --> C[Atomic temporary hold]
+    C --> D[Review before expiry]
+    D --> E[Confirm booking]
+    E --> F[QR ticket and notification]
+    C -->|Expires| G[Release inventory]
+    E -->|Customer cancels| H[Eligible waitlist offer]
+    H -->|Single-use token| D
+```
 
 ## Local setup
 
@@ -260,7 +293,7 @@ ticket-booking/
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 18, Vite, React Router, TypeScript and shared CSS tokens |
+| Frontend | React 18, Vite 7, React Router 7, TypeScript 5 and shared CSS tokens |
 | API | Node.js HTTP service with JSON APIs and Server-Sent Events |
 | Database | Prisma 7 + PostgreSQL; optional SQLite local/test profile |
 | Coordination | Optional Redis Pub/Sub and rate-limit counters |
@@ -287,7 +320,74 @@ Cancellation reallocates eligible inventory to category waitlists. Offers expire
 
 See [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md) and [the implementation plan](docs/LOCAL_IMPLEMENTATION_PLAN.md) for deeper context.
 
+## Application routes
+
+| Route | Who uses it | Purpose |
+|---|---|---|
+| `/` | Everyone | Home, recommendations and discovery |
+| `/movies`, `/live-events`, `/search` | Everyone | Filtered, paginated catalogue |
+| `/events/:eventId` | Everyone; customer for booking | Details, showtimes, seat map and review/confirmation |
+| `/login`, `/register`, `/verify-email` | Everyone | Identity and email verification |
+| `/bookings`, `/bookings/:bookingId` | Customer | Ticket history, QR details and cancellation |
+| `/saved`, `/waitlist`, `/account` | Customer | Favourites, offers/history and settings |
+| `/organiser/events` | Organiser/Admin | Owned show dashboard |
+| `/organiser/events/new`, `/organiser/events/:eventId/edit` | Organiser/Admin | Creation and safe editing |
+| `/organiser/reports`, `/organiser/events/:eventId` | Organiser/Admin | Filtered reports and show performance |
+| `/admin`, `/admin/venues` | Administrator | Platform operations and layout management |
+
+### API overview
+
+The frontend uses the existing `/api` service. Representative endpoints include:
+
+| Endpoint | Responsibility |
+|---|---|
+| `/api/auth/register`, `/api/auth/login`, `/api/auth/me` | Identity and session restoration |
+| `/api/events`, `/api/events/:id` | Catalogue and show details |
+| `/api/events/:id/seats` | Inventory reads and temporary holds |
+| `/api/events/:id/stream` | Server-Sent Events inventory invalidations |
+| `/api/events/:id/book` | Confirm seats held by the authenticated customer |
+| `/api/bookings`, `/api/bookings/:id` | Customer bookings and cancellation |
+| `/api/events/:id/waitlist` | Category queue access |
+| `/api/favourites`, `/api/recommendations` | Saved content and recommendation signals |
+| `/api/health`, `/api/ready` | Liveness and dependency readiness |
+
+Consult [API route implementations](apps/api/src/routes) for exact methods, query parameters, payloads and permissions. Browser protection does not replace server-side ownership and role checks.
+
+### Data model at a glance
+
+- City, Venue and Auditorium model managed locations; category/seat layouts become protected after shows use them.
+- Content groups metadata across many scheduled Show records and independent category prices.
+- ShowSeat stores per-show availability, hold ownership, expiry and unavailable reasons.
+- Booking and BookingSeat retain references, selected seats, status and totals.
+- Favourite and WaitlistEntry store customer taste and queue/offer state.
+- BackgroundJob, EmailPreview and administrator audit records expose durable work and operational history.
+
+PostgreSQL and SQLite schemas/migration histories are committed separately. Do not replace either with a raw local database file.
+
 ## Commands
+
+### Configuration reference
+
+Copy `.env.example` rather than creating a partial configuration from scratch. Important groups:
+
+| Variables | Purpose |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection or local SQLite file |
+| `JWT_SECRET`, `CRON_SECRET` | Unique signing/maintenance secrets |
+| `APP_URL`, `WEB_URL`, `ALLOWED_ORIGINS` | Browser links and permitted CORS origins |
+| `SEAT_HOLD_TTL_MINUTES`, `WAITLIST_OFFER_TTL_MINUTES` | Checkout and offer expiry durations |
+| `WORKER_INTERVAL_MS`, `WORKER_BATCH_SIZE` | Maintenance interval and job batch size |
+| `JOB_RETRY_BASE_MS`, `JOB_RETRY_MAX_MS`, `JOB_STALE_AFTER_MS` | Backoff scheduling and interrupted-job recovery |
+| `REDIS_URL` | Optional cross-instance invalidation/rate-limit coordination |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | Optional real email delivery |
+| `READINESS_REQUIRE_SMTP` | Require SMTP configuration for readiness when enabled |
+| `DB_POOL_MAX`, `DB_CONNECT_TIMEOUT_MS`, `DB_IDLE_TIMEOUT_MS` | PostgreSQL pool limits/timeouts |
+| `API_WORKERS`, `API_MAX_IN_FLIGHT`, `PUBLIC_CACHE_TTL_MS` | Multi-process runtime, overload bounds and public-read caching |
+| `TEST_DATABASE_URL` | Separate PostgreSQL test database, never a live database |
+
+For a browser origin change (for example production API-hosted SPA), update `APP_URL`, `WEB_URL` and allowed origins together. Pool limits are per API worker, so account for the total across all instances.
+
+### Script reference
 
 | Command | Purpose |
 |---|---|
@@ -336,3 +436,21 @@ This is **not a guarantee of 10,000 simultaneous authenticated booking users or 
 No hosted demo URL is promised here. Production needs PostgreSQL, strong secrets, HTTPS, correct `APP_URL`/`WEB_URL`/CORS origins, migrations and a separately running worker. Add Redis for cross-instance coordination and verified SMTP for external delivery. Remove public demo credentials and review artwork rights before launch.
 
 Readiness is `/api/ready`; liveness is `/api/health`. Configured Redis and optional `READINESS_REQUIRE_SMTP` affect readiness. `.env.example` documents pooling, hold/offer durations, retry scheduling and scaling. Never publish `.env`, database files, tokens or SMTP secrets.
+
+### Security and production boundaries
+
+- Server-side role and ownership checks protect customer, organiser and administrator operations.
+- Passwords are hashed; request IDs, security headers, allowlisted CORS and scoped rate limits support safer operations.
+- QR codes encode booking references, not payment details. Treat real tickets and email previews as customer data; the gallery uses local demo tickets only.
+- Real SMTP delivery, hosted deployment and production-scale capacity must be verified in the target environment. Local passing tests do not establish production capacity.
+- The repository contains source, migrations, seed scripts, assets and tests. Dependencies, generated Prisma clients, compiled bundles, browser-session files, databases and secrets are intentionally excluded and recreated locally.
+
+### Working on the project
+
+1. Install and configure a local database with the setup above.
+2. Keep API/React and worker processes in separate terminals.
+3. Make frontend changes in `apps/web/src`; keep API/domain changes in `apps/api/src` and `src/lib`.
+4. When changing shared data models, update both database profiles/migrations and the shared contracts as appropriate.
+5. Run build/type checks and regression tests before publishing changes. Review the staged files for secrets and temporary artifacts.
+
+No project-wide license is declared here; verify repository licensing and third-party asset rights before redistribution.
