@@ -1,4 +1,4 @@
-import { EventType, Role } from "@/generated/prisma/client";
+import { EventType, Role, ShowStatus } from "@/generated/prisma/client";
 
 export class ValidationError extends Error {}
 
@@ -126,6 +126,15 @@ export type EventInput = {
   genre: string;
   durationMinutes: number;
   certificate?: string;
+  releaseDate?: string;
+  castNames: string;
+  crewNames: string;
+  trailerUrl?: string;
+  formats: string;
+  performerNames: string;
+  ageRule?: string;
+  entryRule?: string;
+  status: ShowStatus;
   venueId: string;
   date: string;
   time: string;
@@ -200,6 +209,15 @@ export function validateEventInput(body: unknown): EventInput {
   if (certificate && !/^[A-Z0-9+ -]{1,12}$/.test(certificate)) {
     throw new ValidationError("Certificate must be 1 to 12 letters or numbers");
   }
+  const releaseDate = optionalDate(input.releaseDate, "release date");
+  const castNames = listField(input.castNames, "Cast");
+  const crewNames = listField(input.crewNames, "Crew");
+  const performerNames = listField(input.performerNames, "Performers");
+  const formats = listField(input.formats, "Formats") || format;
+  const trailerUrl = optionalUrl(input.trailerUrl, "Trailer URL");
+  const ageRule = optionalText(input.ageRule, "Age rule", 200);
+  const entryRule = optionalText(input.entryRule, "Entry rule", 300);
+  const status = Object.values(ShowStatus).includes(input.status as ShowStatus) ? input.status as ShowStatus : ShowStatus.PUBLISHED;
 
   return {
     title,
@@ -210,11 +228,52 @@ export function validateEventInput(body: unknown): EventInput {
     genre,
     durationMinutes,
     certificate: certificate || undefined,
+    releaseDate,
+    castNames,
+    crewNames,
+    trailerUrl,
+    formats,
+    performerNames,
+    ageRule,
+    entryRule,
+    status,
     venueId: input.venueId,
     date: input.date,
     time: input.time,
     prices,
   };
+}
+
+function optionalText(value: unknown, label: string, maxLength: number) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.trim().length > maxLength) throw new ValidationError(`${label} is too long`);
+  return value.trim();
+}
+
+function listField(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string") throw new ValidationError(`${label} must be text`);
+  const items = value.split(/[|,]/).map((item) => item.trim()).filter(Boolean);
+  if (items.length > 30 || items.some((item) => item.length > 80)) throw new ValidationError(`${label} contains too many or overly long entries`);
+  return items.join("|");
+}
+
+function optionalDate(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new ValidationError(`Enter a valid ${label}`);
+  return value;
+}
+
+function optionalUrl(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 500) throw new ValidationError(`${label} is invalid`);
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") throw new Error();
+    return parsed.toString();
+  } catch {
+    throw new ValidationError(`${label} must be an HTTP or HTTPS URL`);
+  }
 }
 
 export function validateSeatIds(value: unknown) {

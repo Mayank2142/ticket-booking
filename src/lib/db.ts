@@ -2,9 +2,11 @@ import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Prisma, PrismaClient } from "@/generated/prisma/client";
 import { PrismaClient as SqlitePrismaClient } from "@/generated/prisma-test/client";
+import { isAbsolute, resolve } from "node:path";
+import { repositoryRoot } from "@/lib/env";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-const databaseUrl = process.env.DATABASE_URL ?? "file:./dev.db";
+const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL ?? "file:./dev.db");
 
 export const usesPostgres = /^postgres(?:ql)?:\/\//i.test(databaseUrl);
 
@@ -27,6 +29,13 @@ function createClient() {
 export const db = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
+
+function normalizeDatabaseUrl(value: string) {
+  if (!value.startsWith("file:")) return value;
+  const path = value.slice("file:".length);
+  if (isAbsolute(path) || /^[a-zA-Z]:[\\/]/.test(path)) return value;
+  return `file:${resolve(repositoryRoot, path).replaceAll("\\", "/")}`;
+}
 
 /**
  * PostgreSQL's serializable isolation turns write races into retryable P2034

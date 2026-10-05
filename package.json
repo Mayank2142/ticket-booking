@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "workspaces": [
-    "apps/web",
+    "apps/*",
     "packages/*"
   ],
   "engines": {
@@ -19,25 +19,31 @@
     }
   },
   "scripts": {
-    "dev": "next dev",
-    "dev:legacy": "next dev",
+    "dev": "node scripts/dev-local.mjs",
+    "dev:api": "npm run dev --workspace @cinebook/api",
     "dev:web": "npm run dev --workspace @cinebook/web",
     "db:generate": "prisma generate && prisma generate --schema prisma/schema.test.prisma",
-    "build": "npm run db:generate && next build",
+    "build": "npm run db:generate && npm run build:web && npm run typecheck",
     "build:web": "npm run build --workspace @cinebook/web",
-    "start": "next start",
+    "start": "npm run start --workspace @cinebook/api",
+    "start:scale": "tsx apps/api/src/cluster.ts",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && npm run typecheck:web",
     "typecheck:web": "npm run typecheck --workspace @cinebook/web",
     "test": "node scripts/run-tests.mjs",
     "test:postgres": "node scripts/run-postgres-tests.mjs",
     "test:e2e": "playwright test",
+    "test:load": "node scripts/load-test.mjs",
     "email:verify": "tsx scripts/verify-email.ts",
     "cron:cleanup": "tsx scripts/invoke-cleanup.ts",
     "worker:start": "tsx apps/worker/src/index.ts",
+    "redis:up": "docker compose -f compose.redis.yml up -d",
+    "redis:down": "docker compose -f compose.redis.yml down",
+    "redis:diagnostics": "tsx scripts/check-redis.ts",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:deploy:sqlite": "prisma migrate deploy --config prisma.test.config.ts",
+    "db:setup:sqlite": "npm run db:deploy:sqlite",
     "db:migrate:sqlite": "tsx scripts/migrate-sqlite-to-postgres.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio"
@@ -50,12 +56,9 @@
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
-    "next": "^16.3.8",
     "nodemailer": "^10.0.13",
     "pg": "8.16.3",
     "qrcode": "^1.5.4",
-    "react": "^18",
-    "react-dom": "^18",
     "redis": "5.9.0"
   },
   "devDependencies": {
@@ -66,14 +69,10 @@
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/qrcode": "^1.5.6",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
     "eslint": "^9.39.3",
-    "eslint-config-next": "^16.3.8",
-    "postcss": "^8",
     "prisma": "^7.9.1",
-    "tailwindcss": "^3.4.1",
     "tsx": "^4.23.12",
+    "typescript-eslint": "^8.71.0",
     "typescript": "^5"
   }
 }

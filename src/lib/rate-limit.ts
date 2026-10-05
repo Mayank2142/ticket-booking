@@ -1,5 +1,4 @@
 import { createHash } from "node:crypto";
-import { NextRequest, NextResponse } from "next/server";
 import { getRedisClient } from "./realtime";
 
 export type RateLimitPolicy = {
@@ -21,7 +20,7 @@ export type RateLimitDecision = {
   source: "redis" | "memory";
 };
 
-function clientAddress(req: NextRequest) {
+function clientAddress(req: Request) {
   const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
   return forwarded || req.headers.get("x-real-ip") || "unknown";
 }
@@ -60,7 +59,7 @@ function localDecision(key: string, policy: RateLimitPolicy, now: number): RateL
 }
 
 export async function checkRateLimit(
-  req: NextRequest,
+  req: Request,
   policy: RateLimitPolicy,
   identity?: string
 ): Promise<RateLimitDecision> {
@@ -110,7 +109,7 @@ export function rateLimitHeaders(decision: RateLimitDecision) {
 
 export function rateLimitResponse(decision: RateLimitDecision) {
   const retryAfter = Math.max(1, Math.ceil((decision.resetAt - Date.now()) / 1000));
-  return NextResponse.json(
+  return Response.json(
     { error: "Too many requests. Please try again shortly." },
     {
       status: 429,
@@ -120,7 +119,7 @@ export function rateLimitResponse(decision: RateLimitDecision) {
 }
 
 export async function enforceRateLimit(
-  req: NextRequest,
+  req: Request,
   policy: RateLimitPolicy,
   identity?: string
 ) {

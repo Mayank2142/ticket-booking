@@ -9,7 +9,7 @@ export function QrTicket({ reference, size = 152 }: { reference: string; size?: 
     QRCode.toDataURL(reference, {
       margin: 2,
       width: Math.max(size * 2, 256),
-      color: { dark: "#07110d", light: "#ffffff" }
+      color: { dark: "#080b14", light: "#f5f7ff" }
     }).then((value) => { if (active) setSource(value); }).catch(() => { if (active) setSource(""); });
     return () => { active = false; };
   }, [reference, size]);

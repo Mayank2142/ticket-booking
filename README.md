@@ -4,14 +4,14 @@
 
 ### Fair, concurrency-safe ticket booking for movies and concerts
 
-<img src="public/images/Screenshot 2026-08-24 233531.png" alt="CineBook cinematic booking experience" width="900" />
+<img src="public/images/cinebook-stitch-home.png" alt="CineBook Cinematic Precision discovery experience" width="900" />
 
-[![Next.js API](https://img.shields.io/badge/Next.js%20API-16-000000?logo=nextdotjs)](https://nextjs.org/)
+[![Node API](https://img.shields.io/badge/Node.js%20API-22-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma)](https://www.prisma.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-5.x-DC382D?logo=redis&logoColor=white)](https://redis.io/)
-[![Tests](https://img.shields.io/badge/tests-16%20API%20%2B%203%20E2E-22c55e)](#testing)
+[![Tests](https://img.shields.io/badge/tests-33%20API%20%2B%2012%20E2E-22c55e)](#testing)
 [![Branch](https://img.shields.io/badge/branch-main-6366f1)](https://github.com/Mayank2142/ticket-booking/tree/main)
 
 Premium event discovery · visual seat selection · expiring holds · fair waitlist offers · QR email tickets
@@ -24,13 +24,7 @@ Premium event discovery · visual seat selection · expiring holds · fair waitl
 
 ## Product preview
 
-| Discover events | Select seats in real time |
-|---|---|
-| ![Event discovery](output/playwright/events-home.png) | ![Visual seat map](output/playwright/seat-map.png) |
-
-<p align="center"><img src="output/playwright/phase7-catalog.png" alt="City and language catalogue with rich event metadata" width="650" /> <img src="output/playwright/phase7-catalog-mobile.png" alt="Responsive mobile catalogue" width="220" /></p>
-
-The responsive interface follows one cinematic system from discovery to confirmation: deep-black and emerald surfaces, poster-led event cards, live seat states, a curved screen map, sticky checkout summaries, downloadable QR passes, graceful loading/error/empty states, and mobile-first navigation. The artwork in `public/images` is original project artwork generated for CineBook—no third-party film posters or logos are bundled.
+The responsive interface follows one cinematic system from discovery to confirmation: poster-led event cards, live seat states, a curved screen map, sticky checkout summaries, downloadable QR passes, graceful loading/error/empty states, and mobile-first navigation. The artwork in `public/images` is original project artwork generated for CineBook—no third-party film posters or logos are bundled.
 
 ## At a glance
 
@@ -95,16 +89,16 @@ Platform capabilities:
 - Validation for users, events, prices, categories, colours, rows, dates, and seat IDs
 - Separate liveness and dependency-aware readiness endpoints for safe deployment checks
 - Redis-backed rate limits with a bounded in-process fallback, request IDs, allowlisted CORS, CSP, HSTS, and structured JSON logs
-- Sixteen lifecycle, concurrency, catalogue, real-time, and security tests plus three Playwright customer journeys
+- Thirty lifecycle, concurrency, catalogue, jobs, notification, query-validation, and security tests plus twelve Playwright role journeys
 
 ## Technology
 
 | Layer | Choice | Purpose |
 |---|---|---|
 | Frontend | React 18 + Vite + React Router | Standalone customer experience and production bundle |
-| Current API | Next.js 16 route handlers | Patched, tested backend retained while the Express extraction is phased in |
+| API | Node.js 22 HTTP service | Framework-independent JSON/SSE API and React build server |
 | Language | TypeScript 5 | End-to-end type safety |
-| Styling | CSS design system + Tailwind CSS | Standalone React styling plus the legacy dashboard styles during migration |
+| Styling | CSS design system | Shared dark/light visual language across customer and operations routes |
 | Data | Prisma 7 + PostgreSQL | Production relational store, serializable transactions, and pooled connections |
 | Catalogue | Reusable `Content` + scheduled `Event` shows | Multi-show titles, metadata, favourites, and recommendations |
 | Coordination | Redis Pub/Sub + Server-Sent Events | Cross-instance invalidation and browser live updates |
@@ -116,13 +110,13 @@ Platform capabilities:
 
 ## Architecture
 
-> **React migration:** Phases 0–4 are complete and the standalone React + Vite application has full frontend route parity: discovery, authentication, customer booking, waitlists, ticket history, organiser publishing/reporting, and flexible admin venue management. The tested Next.js route handlers remain temporarily as the API layer until the Express extraction phase. See [docs/REACT_MIGRATION.md](docs/REACT_MIGRATION.md). Google Stitch and payment processing are intentionally outside the migration scope.
+> **Local architecture:** The React + Vite application owns every browser route. A standalone Node HTTP service owns the JSON/SSE API and can serve the compiled React application. See [docs/LOCAL_IMPLEMENTATION_PLAN.md](docs/LOCAL_IMPLEMENTATION_PLAN.md) for complete, partial, and remaining local product work.
 
 > **Scale foundation:** Phases 5–8 add PostgreSQL concurrency, Redis/SSE invalidation, a dedicated worker, catalogue/recommendation foundations, rate limiting, request tracing, security headers, readiness checks, and browser-level regression tests. External Railway/SMTP/Redis verification remains separate from local implementation.
 
 ```mermaid
 flowchart LR
-    REACT[React + Vite customer app] --> API[Next.js API routes]
+    REACT[React + Vite application] --> API[Node.js HTTP API]
     API -- SSE --> REACT
     API --> AUTH[JWT role checks]
     API --> CORE[Seat and waitlist state machine]
@@ -207,7 +201,6 @@ ticket-booking/
 │   ├── realtime.test.ts
 │   ├── security.test.ts
 │   └── e2e/customer.spec.ts     # Production-build browser journeys
-├── output/playwright/           # Verified README screenshots
 ├── playwright.config.ts         # API + React preview test orchestration
 ├── proxy.ts                     # Request IDs and allowlisted API CORS
 ├── .env.example
@@ -228,7 +221,7 @@ cp .env.example .env
 # Create the local `cinebook` PostgreSQL database, then update DATABASE_URL.
 npm run db:deploy
 npm run db:seed
-npm run dev:legacy
+npm run dev
 ```
 
 On Windows PowerShell, replace the copy command with:
@@ -237,14 +230,14 @@ On Windows PowerShell, replace the copy command with:
 Copy-Item .env.example .env
 ```
 
-Run `npm run dev:legacy` for the current API on port 3000, then `npm run dev:web` in a second terminal. Open [http://localhost:5173](http://localhost:5173) for the standalone React application. The homepage, event detail, and live seat map are public; authentication is requested only when a customer holds, books, joins a waitlist, or opens their tickets.
+`npm run dev` starts the API on port 3000 and the React/Vite application on port 5173. Open [http://localhost:5173](http://localhost:5173). The homepage, event detail, and live seat map are public; authentication is requested only when a customer holds, books, joins a waitlist, or opens their tickets.
 
 For a dependency-light local fallback only, set `DATABASE_URL=file:./dev.db`, run `npm run db:deploy:sqlite`, then `npm run db:seed`. Production and Railway must use PostgreSQL.
 
 ### Five-minute demo path
 
 1. Sign in as the demo customer.
-2. Open **Summer Concert**, choose seats and continue to checkout.
+2. Open **Dune: Part Two** (or any seeded showcase event), choose seats and continue to checkout.
 3. Confirm the booking and download the generated QR pass.
 4. Open **My bookings** to see the ticket wallet and cancellation action.
 5. Sign in as the organiser to inspect booking totals and revenue.
@@ -266,6 +259,9 @@ For a dependency-light local fallback only, set `DATABASE_URL=file:./dev.db`, ru
 | `DB_POOL_MAX` | Recommended | Maximum PostgreSQL pool size; default `10` |
 | `DB_CONNECT_TIMEOUT_MS` | Recommended | Connection acquisition timeout; default `5000` |
 | `DB_IDLE_TIMEOUT_MS` | Recommended | Idle pooled-connection timeout; default `10000` |
+| `API_WORKERS` | Scale-out | Cluster worker count; defaults to the smaller of four or the available CPU count |
+| `API_MAX_IN_FLIGHT` | Recommended | Per-worker overload limit; excess work receives a retryable `503` |
+| `PUBLIC_CACHE_TTL_MS` | Recommended | Short public catalogue cache and request-coalescing window; default `5000` |
 | `SOURCE_DATABASE_URL` | Migration only | Existing SQLite file used only by the one-time copy command |
 | `JWT_SECRET` | Yes | Long random JWT signing secret |
 | `SEAT_HOLD_TTL_MINUTES` | Yes | Checkout hold duration; default `10` |
@@ -293,17 +289,22 @@ npm run email:verify
 
 ```bash
 npm run dev            # Development server
-npm run dev:legacy     # Existing Next.js UI and API on port 3000
-npm run dev:web        # New React + Vite frontend on port 5173
-npm run build          # Prisma generation + production build
+npm run dev:api        # Node API on port 3000
+npm run dev:web        # React + Vite frontend on port 5173
+npm run start:scale    # Run the API with multiple local Node workers
+npm run build          # Prisma generation + React build + type checking
 npm run build:web      # Type-check and build the React frontend
 npm run lint           # ESLint flat-config validation
 npm run typecheck      # TypeScript validation
 npm run typecheck:web  # React frontend TypeScript validation
-npm test               # Sixteen isolated API/domain/security tests
+npm test               # Thirty-three isolated API/domain/security/scaling tests
 npm run test:postgres  # Same suite against TEST_DATABASE_URL (*_test only)
-npm run test:e2e       # Three Chromium journeys against production builds
+npm run test:e2e       # Twelve Chromium role/accessibility journeys
+npm run test:load      # Staged 10,000-arrival local capacity test
 npm run email:verify   # Verify configured SMTP credentials
+npm run redis:up       # Start the optional local Redis container
+npm run redis:diagnostics # Show Redis configuration and connectivity
+npm run redis:down     # Stop the local Redis container
 npm run cron:cleanup   # Invoke the deployed cleanup endpoint once
 npm run worker:start  # Run continuous expiry and delivery maintenance
 npm run db:deploy      # Apply committed migrations
@@ -314,7 +315,7 @@ npm run db:migrate:sqlite # One-time SQLite → PostgreSQL data copy
 
 ## Testing
 
-`npm test` creates a disposable SQLite database for fast local regression. `npm run test:postgres` applies the production migrations to `TEST_DATABASE_URL` and runs the identical suite; for safety it refuses any database whose name does not end in `_test`. `npm run test:e2e` starts the production API and React preview, then exercises the customer experience in Chromium. GitHub Actions provisions PostgreSQL 16 and runs all three layers. Coverage includes:
+`npm test` creates a disposable SQLite database for fast local regression. `npm run test:postgres` applies the production migrations to `TEST_DATABASE_URL` and runs the identical suite; for safety it refuses any database whose name does not end in `_test`. `npm run test:e2e` starts the production API and React preview, then exercises the customer experience in Chromium. The local worker persists jobs before processing them, recovers interrupted work after restart, and stores rendered HTML/text email previews when SMTP is not configured. Administrators can inspect both from the Operations section. Coverage includes:
 
 1. Simultaneous holds and bookings produce exactly one winner.
 2. Expired checkout holds return to `AVAILABLE`.
@@ -332,8 +333,25 @@ npm run db:migrate:sqlite # One-time SQLite → PostgreSQL data copy
 14. Rate limits block requests after the configured allowance.
 15. Rate-limit buckets remain isolated by scope and customer/IP identity.
 16. `429` responses expose retry metadata without leaking private identifiers.
+17. Durable jobs preserve attempts, recover interrupted work, and schedule exponential retries.
+18. Every notification template renders HTML and plain text and is saved to the local preview inbox.
+19. Catalogue pagination and filter queries reject invalid or out-of-range values.
 
-Playwright additionally verifies discovery and the live seat map, immediate navigation updates after login plus favourites, and keyboard skip navigation.
+Playwright additionally verifies customer, organiser, and administrator journeys; light-mode readability; 320/390px responsive layouts; mobile city selection; dialog focus restoration; seat-map keyboard navigation; image fallbacks; and duplicate-ID or unnamed-control regressions.
+
+### Local capacity test
+
+Build first, then run the clustered API and the load harness in separate PowerShell terminals:
+
+```powershell
+npm run build
+$env:NODE_ENV="production"; npm run start:scale
+npm run test:load
+```
+
+The harness sends 10,000 simultaneous arrivals through a bounded 2,000-socket pool and fails when any response errors or p95 exceeds five seconds. Override `LOAD_TEST_URL`, `LOAD_TEST_USERS`, `LOAD_TEST_SOCKETS`, `LOAD_TEST_MAX_P95_MS`, or `LOAD_TEST_MAX_ERROR_RATE` to test another profile. It targets public catalogue and health reads; authenticated booking correctness remains covered separately by the transactional concurrency suite.
+
+The scaled API uses one worker per configured process, short-lived public-read caching with single-flight miss coalescing, immutable caching for fingerprinted assets, sampled access logs, bounded in-flight work, tuned keep-alive settings, PostgreSQL pooling, and optional Redis coordination. Use PostgreSQL for multi-worker booking traffic; SQLite remains a convenience profile for local development and read-only capacity experiments.
 
 ## API reference
 
@@ -371,7 +389,7 @@ Errors use `{ "error": "message" }`; successful responses are JSON objects named
 - `Event → ShowSeat` materialises live per-show status and hold ownership/expiry.
 - `Booking → BookingSeat` stores immutable booking reference, amount, and selected seats.
 - `WaitlistEntry` stores a unique queue position, status, offer token, expiry, and offered seat.
-- Booking/offer email timestamps and attempt counts form a small durable delivery queue.
+- `BackgroundJob` persists maintenance and notification work with attempts, retry timing, and failure reasons; `EmailPreview` stores local HTML/text output when SMTP is absent.
 
 The complete source of truth is [prisma/schema.prisma](prisma/schema.prisma).
 

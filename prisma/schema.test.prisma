@@ -22,6 +22,13 @@ enum SeatStatus {
   AVAILABLE
   HELD
   BOOKED
+  UNAVAILABLE
+}
+
+enum SeatType {
+  STANDARD
+  WHEELCHAIR
+  COMPANION
 }
 
 enum BookingStatus {
@@ -36,6 +43,13 @@ enum WaitlistStatus {
   EXPIRED
 }
 
+enum ShowStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  ARCHIVED
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -43,11 +57,27 @@ model User {
   name      String
   role      Role     @default(CUSTOMER)
   createdAt DateTime @default(now())
-  events    Event[]
+  reminderEmails Boolean @default(true)
+  waitlistAlerts Boolean @default(true)
+  emailVerifiedAt DateTime?
+  emailVerificationTokenHash String? @unique
+  emailVerificationExpiresAt DateTime?
+  events    Show[]
   bookings  Booking[]
   waitlist  WaitlistEntry[]
   heldSeats ShowSeat[] @relation("HeldBy")
   favourites Favourite[]
+  recentlyViewed RecentlyViewed[]
+  auditLogs AuditLog[] @relation("AuditActor")
+}
+
+model City {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  archivedAt DateTime?
+  venues    Venue[]
 }
 
 model Venue {
@@ -59,9 +89,27 @@ model Venue {
   rows       Int
   cols       Int
   createdAt  DateTime       @default(now())
+  archivedAt DateTime?
+  cityId     String?
+  cityRecord City?          @relation(fields: [cityId], references: [id])
   categories SeatCategory[]
   seats      Seat[]
-  events     Event[]
+  events     Show[]
+  auditoriums Auditorium[]
+  @@index([cityId, name])
+}
+
+model Auditorium {
+  id        String   @id @default(cuid())
+  venueId   String
+  venue     Venue    @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name      String
+  rows      Int
+  cols      Int
+  createdAt DateTime @default(now())
+  archivedAt DateTime?
+  shows     Show[]
+  @@unique([venueId, name])
 }
 
 model Content {
@@ -76,10 +124,30 @@ model Content {
   durationMinutes Int       @default(120)
   certificate     String?
   posterUrl       String?
+  releaseDate     String?
+  castNames       String    @default("")
+  crewNames       String    @default("")
+  trailerUrl      String?
+  formats         String    @default("")
+  performerNames  String    @default("")
+  ageRule         String?
+  entryRule       String?
   createdAt       DateTime  @default(now())
-  shows      Event[]
+  shows      Show[]
   favourites Favourite[]
+  recentlyViewed RecentlyViewed[]
   @@index([type, language, genre])
+}
+
+model RecentlyViewed {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentId String
+  content   Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  viewedAt  DateTime @default(now())
+  @@unique([userId, contentId])
+  @@index([userId, viewedAt])
 }
 
 model Favourite {
@@ -113,12 +181,17 @@ model Seat {
   row        Int
   col        Int
   label      String
+  seatType   SeatType     @default(STANDARD)
+  aisleAfter Boolean      @default(false)
+  isBlocked  Boolean      @default(false)
+  viewLabel  String?
+  viewScore  Int?
   showSeats    ShowSeat[]
   bookingSeats BookingSeat[]
   @@unique([venueId, row, col])
 }
 
-model Event {
+model Show {
   id          String    @id @default(cuid())
   organiserId String
   organiser   User      @relation(fields: [organiserId], references: [id])
@@ -126,6 +199,9 @@ model Event {
   venue       Venue     @relation(fields: [venueId], references: [id])
   contentId   String?
   content     Content?  @relation(fields: [contentId], references: [id])
+  auditoriumId String?
+  auditorium Auditorium? @relation(fields: [auditoriumId], references: [id])
+  status      ShowStatus @default(PUBLISHED)
   title       String
   type        EventType
   description String?
@@ -137,12 +213,15 @@ model Event {
   bookings  Booking[]
   waitlist  WaitlistEntry[]
   @@index([contentId, date, time])
+  @@index([status, date, time])
+  @@index([auditoriumId, date, time])
+  @@map("Event")
 }
 
 model CategoryPrice {
   id         String       @id @default(cuid())
   eventId    String
-  event      Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event      Show         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   categoryId String
   category   SeatCategory @relation(fields: [categoryId], references: [id])
   price      Float
@@ -152,7 +231,7 @@ model CategoryPrice {
 model ShowSeat {
   id        String     @id @default(cuid())
   eventId   String
-  event     Event      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event     Show       @relation(fields: [eventId], references: [id], onDelete: Cascade)
   seatId    String
   seat      Seat       @relation(fields: [seatId], references: [id])
   status    SeatStatus @default(AVAILABLE)
@@ -160,6 +239,7 @@ model ShowSeat {
   heldById  String?
   heldBy    User?      @relation("HeldBy", fields: [heldById], references: [id])
   version   Int        @default(0)
+  unavailableReason String?
   @@unique([eventId, seatId])
 }
 
@@ -168,12 +248,15 @@ model Booking {
   userId              String
   user                User          @relation(fields: [userId], references: [id])
   eventId             String
-  event               Event         @relation(fields: [eventId], references: [id])
+  event               Show          @relation(fields: [eventId], references: [id])
   ref                 String        @unique
   status              BookingStatus @default(CONFIRMED)
   totalAmount         Float
   ticketEmailSentAt   DateTime?
   ticketEmailAttempts Int           @default(0)
+  ticketEmailLastError String?
+  cancellationEmailSentAt DateTime?
+  reminderEmailSentAt DateTime?
   createdAt           DateTime      @default(now())
   seats BookingSeat[]
 }
@@ -192,7 +275,7 @@ model WaitlistEntry {
   userId                    String
   user                      User           @relation(fields: [userId], references: [id])
   eventId                   String
-  event                     Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event                     Show           @relation(fields: [eventId], references: [id], onDelete: Cascade)
   categoryId                String
   category                  SeatCategory   @relation(fields: [categoryId], references: [id])
   position                  Int
@@ -202,8 +285,79 @@ model WaitlistEntry {
   offeredSeatId             String?
   offerNotifiedAt           DateTime?
   offerNotificationAttempts Int            @default(0)
+  offerNotificationLastError String?
+  joinedEmailSentAt          DateTime?
+  expiredEmailSentAt         DateTime?
   createdAt                 DateTime       @default(now())
   @@unique([eventId, categoryId, userId])
   @@unique([eventId, categoryId, position])
   @@index([eventId, categoryId, status, position])
+}
+
+model MaintenanceRun {
+  id          String    @id @default(cuid())
+  status      String
+  resultJson  String    @default("{}")
+  error       String?
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  @@index([startedAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String   @default("{}")
+  createdAt  DateTime @default(now())
+  @@index([createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model AlertSubscription {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  active             Boolean  @default(true)
+  confirmationSentAt DateTime?
+  deliveryAttempts   Int      @default(0)
+  lastError          String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  @@index([active, createdAt])
+}
+
+model BackgroundJob {
+  id          String   @id @default(cuid())
+  type        String
+  payloadJson String   @default("{}")
+  status      String   @default("PENDING")
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  availableAt DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+  lastError   String?
+  resultJson  String   @default("{}")
+  dedupeKey   String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([status, availableAt])
+  @@index([type, status])
+}
+
+model EmailPreview {
+  id              String   @id @default(cuid())
+  kind            String
+  recipient       String
+  subject         String
+  textBody        String
+  htmlBody        String
+  relatedEntityId String?
+  createdAt       DateTime @default(now())
+  @@index([createdAt])
+  @@index([kind, createdAt])
 }

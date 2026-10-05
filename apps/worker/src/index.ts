@@ -1,5 +1,6 @@
 import "dotenv/config";
-import { runMaintenanceCycle } from "../../../src/lib/maintenance";
+import { processDueBackgroundJobs } from "../../../src/lib/job-worker";
+import { enqueueBackgroundJob, JOB_TYPES, recoverAllRunningJobs } from "../../../src/lib/jobs";
 
 const configuredInterval = Number(process.env.WORKER_INTERVAL_MS ?? 30_000);
 const intervalMs = Number.isFinite(configuredInterval) && configuredInterval >= 5_000
@@ -17,8 +18,10 @@ async function tick() {
   if (running || stopping) return;
   running = true;
   try {
-    const result = await runMaintenanceCycle();
-    log("info", "maintenance.completed", result);
+    const bucket = Math.floor(Date.now() / intervalMs);
+    await enqueueBackgroundJob({ type: JOB_TYPES.MAINTENANCE, dedupeKey: `maintenance:${bucket}`, maxAttempts: 8 });
+    const result = await processDueBackgroundJobs(Number(process.env.WORKER_BATCH_SIZE ?? 25));
+    log("info", "jobs.completed", result);
   } catch (error) {
     log("error", "maintenance.failed", {
       message: error instanceof Error ? error.message : String(error),
@@ -29,7 +32,8 @@ async function tick() {
   }
 }
 
-log("info", "worker.started", { intervalMs, redisEnabled: Boolean(process.env.REDIS_URL) });
+const recoveredOnStart = process.env.WORKER_RECOVER_RUNNING_ON_START === "false" ? { count: 0 } : await recoverAllRunningJobs();
+log("info", "worker.started", { intervalMs, redisEnabled: Boolean(process.env.REDIS_URL), recoveredJobs: recoveredOnStart.count });
 void tick();
 const timer = setInterval(() => void tick(), intervalMs);
 

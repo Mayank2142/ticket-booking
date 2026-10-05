@@ -1,4 +1,4 @@
-import type { EventSummaryDto, EventType } from "@/contracts/api";
+import type { EventSummaryDto, EventType, ShowStatus } from "@cinebook/shared";
 
 type CatalogEventRecord = {
   id: string;
@@ -8,6 +8,7 @@ type CatalogEventRecord = {
   description: string | null;
   date: string;
   time: string;
+  status?: ShowStatus;
   content: {
     language: string;
     format: string;
@@ -15,6 +16,14 @@ type CatalogEventRecord = {
     durationMinutes: number;
     certificate: string | null;
     posterUrl: string | null;
+    releaseDate?: string | null;
+    castNames?: string;
+    crewNames?: string;
+    trailerUrl?: string | null;
+    formats?: string;
+    performerNames?: string;
+    ageRule?: string | null;
+    entryRule?: string | null;
   } | null;
   venue: { name: string; city: string; auditorium: string };
   organiser: { name: string };
@@ -44,6 +53,14 @@ export function toEventSummary(
     durationMinutes: event.type === "MOVIE" ? 150 : 180,
     certificate: null,
     posterUrl: null,
+    releaseDate: null,
+    castNames: "",
+    crewNames: "",
+    trailerUrl: null,
+    formats: "",
+    performerNames: "",
+    ageRule: null,
+    entryRule: null,
   };
 
   return {
@@ -58,6 +75,15 @@ export function toEventSummary(
     durationMinutes: metadata.durationMinutes,
     certificate: metadata.certificate,
     posterUrl: metadata.posterUrl,
+    releaseDate: metadata.releaseDate ?? null,
+    cast: splitList(metadata.castNames),
+    crew: splitList(metadata.crewNames),
+    trailerUrl: metadata.trailerUrl,
+    formats: splitList(metadata.formats || metadata.format),
+    performers: splitList(metadata.performerNames),
+    ageRule: metadata.ageRule,
+    entryRule: metadata.entryRule,
+    status: event.status ?? "PUBLISHED",
     isFavourite: Boolean(event.contentId && favouriteContentIds.has(event.contentId)),
     date: event.date,
     time: event.time,
@@ -65,6 +91,10 @@ export function toEventSummary(
     organiser: event.organiser,
     prices: event.prices,
   };
+}
+
+function splitList(value?: string) {
+  return (value ?? "").split("|").map((item) => item.trim()).filter(Boolean);
 }
 
 export function startingPrice(prices: Array<{ price: number }>) {

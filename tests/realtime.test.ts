@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NextRequest } from "next/server";
-import { GET as openSeatStream } from "../src/app/api/events/[id]/stream/route";
+import { openSeatStream } from "../apps/api/src/routes/events";
 import { publishSeatUpdate, subscribeToSeatUpdates } from "../src/lib/realtime";
 
 test("local seat invalidation reaches only subscribers for the matching event", async () => {
@@ -27,10 +26,10 @@ test("unsubscribed listeners no longer receive invalidations", async () => {
 
 test("SSE route sends a complete ready event and live inventory event", async () => {
   const abort = new AbortController();
-  const request = new NextRequest("http://localhost/api/events/event-stream/stream", {
+  const request = new Request("http://localhost/api/events/event-stream/stream", {
     signal: abort.signal,
   });
-  const response = await openSeatStream(request, { params: Promise.resolve({ id: "event-stream" }) });
+  const response = await openSeatStream(request, { id: "event-stream" });
   const reader = response.body?.getReader();
   assert.ok(reader);
   assert.match(response.headers.get("content-type") ?? "", /^text\/event-stream/);

@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const useRunningServers = process.env.PLAYWRIGHT_USE_RUNNING_SERVERS === "1";
+
 export default defineConfig({
   testDir: "./tests/e2e",
   fullyParallel: false,
@@ -15,9 +17,9 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
   ],
-  webServer: [
+  webServer: useRunningServers ? undefined : [
     {
-      command: "node node_modules/next/dist/bin/next start",
+      command: "node node_modules/tsx/dist/cli.mjs apps/api/src/server.ts",
       url: "http://127.0.0.1:3000/api/ready",
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,

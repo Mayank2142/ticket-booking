@@ -7,6 +7,7 @@ import {
   PrismaClient as PostgresClient,
   Role,
   SeatStatus,
+  ShowStatus,
   WaitlistStatus,
 } from "../src/generated/prisma/client";
 import { PrismaClient as SqliteClient } from "../src/generated/prisma-test/client";
@@ -21,19 +22,22 @@ const source = new SqliteClient({ adapter: new PrismaBetterSqlite3({ url: source
 const target = new PostgresClient({ adapter: new PrismaPg({ connectionString: targetUrl }) });
 
 async function main() {
-  const [users, venues, categories, seats, contents, events, prices, showSeats, bookings, bookingSeats, waitlist, favourites] = await Promise.all([
+  const [users, cities, venues, auditoriums, categories, seats, contents, shows, prices, showSeats, bookings, bookingSeats, waitlist, favourites, recentlyViewed] = await Promise.all([
     source.user.findMany(),
+    source.city.findMany(),
     source.venue.findMany(),
+    source.auditorium.findMany(),
     source.seatCategory.findMany(),
     source.seat.findMany(),
     source.content.findMany(),
-    source.event.findMany(),
+    source.show.findMany(),
     source.categoryPrice.findMany(),
     source.showSeat.findMany(),
     source.booking.findMany(),
     source.bookingSeat.findMany(),
     source.waitlistEntry.findMany(),
     source.favourite.findMany(),
+    source.recentlyViewed.findMany(),
   ]);
 
   const existingRows = await target.user.count();
@@ -41,32 +45,38 @@ async function main() {
 
   await target.$transaction(async (tx) => {
     await tx.user.createMany({ data: users.map((row) => ({ ...row, role: row.role as Role })) });
+    await tx.city.createMany({ data: cities });
     await tx.venue.createMany({ data: venues });
+    await tx.auditorium.createMany({ data: auditoriums });
     await tx.seatCategory.createMany({ data: categories });
     await tx.seat.createMany({ data: seats });
     await tx.content.createMany({ data: contents.map((row) => ({ ...row, type: row.type as EventType })) });
-    await tx.event.createMany({ data: events.map((row) => ({ ...row, type: row.type as EventType })) });
+    await tx.show.createMany({ data: shows.map((row) => ({ ...row, type: row.type as EventType, status: row.status as ShowStatus })) });
     await tx.categoryPrice.createMany({ data: prices });
     await tx.showSeat.createMany({ data: showSeats.map((row) => ({ ...row, status: row.status as SeatStatus })) });
     await tx.booking.createMany({ data: bookings.map((row) => ({ ...row, status: row.status as BookingStatus })) });
     await tx.bookingSeat.createMany({ data: bookingSeats });
     await tx.waitlistEntry.createMany({ data: waitlist.map((row) => ({ ...row, status: row.status as WaitlistStatus })) });
     await tx.favourite.createMany({ data: favourites });
+    await tx.recentlyViewed.createMany({ data: recentlyViewed });
   }, { maxWait: 10_000, timeout: 120_000 });
 
   const copied = {
     users: users.length,
+    cities: cities.length,
     venues: venues.length,
     categories: categories.length,
     seats: seats.length,
     contents: contents.length,
-    events: events.length,
+    auditoriums: auditoriums.length,
+    shows: shows.length,
     prices: prices.length,
     showSeats: showSeats.length,
     bookings: bookings.length,
     bookingSeats: bookingSeats.length,
     waitlist: waitlist.length,
     favourites: favourites.length,
+    recentlyViewed: recentlyViewed.length,
   };
   console.log("SQLite → PostgreSQL migration complete", copied);
 }

@@ -37,7 +37,9 @@ run([
   "tests/booking-lifecycle.test.ts",
   "tests/catalog.test.ts",
   "tests/realtime.test.ts",
+  "tests/jobs-notifications.test.ts",
   "tests/security.test.ts",
+  "tests/scaling.test.ts",
 ]);
 
 if (existsSync(databasePath)) rmSync(databasePath);

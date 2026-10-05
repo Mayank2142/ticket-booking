@@ -1,8 +1,8 @@
 import { randomBytes } from "crypto";
 import { Prisma, SeatStatus, WaitlistStatus } from "@/generated/prisma/client";
 import { HOLD_TTL_MINUTES, WAITLIST_OFFER_MINUTES } from "./constants";
-import { deliverWaitlistOffer } from "./delivery";
 import { db, serializableTransaction } from "./db";
+import { enqueueBackgroundJob, JOB_TYPES } from "./jobs";
 import { publishSeatUpdate } from "./realtime";
 
 class WaitlistClaimConflict extends Error {}
@@ -239,6 +239,7 @@ export async function confirmBooking(
       },
       include: { seats: { include: { seat: true } }, event: true, user: true },
     });
+    await enqueueBackgroundJob({ type: JOB_TYPES.BOOKING_CONFIRMATION, payload: { id: booking.id }, dedupeKey: `${JOB_TYPES.BOOKING_CONFIRMATION}:${booking.id}` }, tx);
 
     if (offer) {
       const fulfilled = await tx.waitlistEntry.updateMany({
@@ -307,13 +308,13 @@ export async function offerNextWaitlistForSeat(eventId: string, seatId: string) 
           },
         });
         if (seatClaim.count !== 1) throw new SeatClaimConflict();
+        await enqueueBackgroundJob({ type: JOB_TYPES.WAITLIST_OFFER, payload: { id: next.id }, dedupeKey: `${JOB_TYPES.WAITLIST_OFFER}:${next.id}:${token.slice(0, 12)}` }, tx);
         return { entryId: next.id, token, offerExpiresAt, seatId };
       });
 
       if (!claimed) return null;
       void publishSeatUpdate(eventId, "waitlist-offer");
-      const email = await deliverWaitlistOffer(claimed.entryId);
-      return { ...claimed, email };
+      return claimed;
     } catch (error) {
       if (error instanceof SeatClaimConflict) return null;
       if (!(error instanceof WaitlistClaimConflict) || attempt === 4) throw error;
@@ -330,7 +331,7 @@ export async function expireStaleOffers(eventId?: string) {
       offerExpiresAt: { lt: now },
       ...(eventId ? { eventId } : {}),
     },
-    select: { id: true, eventId: true, userId: true, offeredSeatId: true },
+    select: { id: true, eventId: true, userId: true, offeredSeatId: true, offerToken: true },
   });
 
   let expiredCount = 0;
@@ -346,6 +347,8 @@ export async function expireStaleOffers(eventId?: string) {
         },
       });
       if (updated.count !== 1) return false;
+
+      await enqueueBackgroundJob({ type: JOB_TYPES.WAITLIST_OFFER_EXPIRED, payload: { id: entry.id }, dedupeKey: `${JOB_TYPES.WAITLIST_OFFER_EXPIRED}:${entry.id}:${entry.offerToken?.slice(0, 12) ?? "expired"}` }, tx);
 
       if (entry.offeredSeatId) {
         await tx.showSeat.updateMany({
@@ -395,6 +398,8 @@ export async function cancelBooking(bookingId: string, userId: string) {
       data: { status: "CANCELLED" },
     });
     if (statusChange.count !== 1) throw new Error("Booking is already cancelled");
+
+    await enqueueBackgroundJob({ type: JOB_TYPES.BOOKING_CANCELLATION, payload: { id: booking.id }, dedupeKey: `${JOB_TYPES.BOOKING_CANCELLATION}:${booking.id}` }, tx);
 
     const freedSeats: string[] = [];
     for (const { seatId } of booking.seats) {

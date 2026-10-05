@@ -1,18 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { NextRequest } from "next/server";
 import {
   checkRateLimit,
   rateLimitResponse,
   resetLocalRateLimitsForTests,
 } from "../src/lib/rate-limit";
+import { eventRoutes, parseEventListQuery } from "../apps/api/src/routes/events";
 
 test.beforeEach(() => {
   resetLocalRateLimitsForTests();
 });
 
 test("rate limiter rejects requests after the configured allowance", async () => {
-  const request = new NextRequest("http://localhost/api/auth/login", {
+  const request = new Request("http://localhost/api/auth/login", {
     headers: { "x-forwarded-for": "203.0.113.10" },
   });
   const policy = { scope: "security-test", limit: 2, windowMs: 60_000 };
@@ -31,7 +31,7 @@ test("rate limiter rejects requests after the configured allowance", async () =>
 });
 
 test("rate-limit buckets are isolated by scope and identity", async () => {
-  const request = new NextRequest("http://localhost/api/events");
+  const request = new Request("http://localhost/api/events");
   const policy = { scope: "hold", limit: 1, windowMs: 60_000 };
 
   assert.equal((await checkRateLimit(request, policy, "customer-a")).allowed, true);
@@ -41,7 +41,7 @@ test("rate-limit buckets are isolated by scope and identity", async () => {
 });
 
 test("rate-limit response exposes retry metadata without leaking identity", async () => {
-  const request = new NextRequest("http://localhost/api/events");
+  const request = new Request("http://localhost/api/events");
   const policy = { scope: "response", limit: 1, windowMs: 30_000 };
   await checkRateLimit(request, policy, "private-user-id");
   const blocked = await checkRateLimit(request, policy, "private-user-id");
@@ -54,4 +54,36 @@ test("rate-limit response exposes retry metadata without leaking identity", asyn
   assert.ok(Number(response.headers.get("retry-after")) >= 1);
   assert.deepEqual(body, { error: "Too many requests. Please try again shortly." });
   assert.doesNotMatch(JSON.stringify(body), /private-user-id/);
+});
+
+test("event pagination accepts bounded integers and preserves reproducible query values", () => {
+  const query = parseEventListQuery(new URL("http://localhost/api/events?page=3&pageSize=24&sort=price-asc&upcoming=true&date=2030-11-15&city=Mumbai"));
+  assert.equal(query.page, 3);
+  assert.equal(query.pageSize, 24);
+  assert.equal(query.sort, "price-asc");
+  assert.equal(query.upcoming, true);
+  assert.equal(query.date, "2030-11-15");
+  assert.equal(query.city, "Mumbai");
+});
+
+test("event listing rejects invalid pagination and filter query values", async () => {
+  const route = eventRoutes.find((item) => item.method === "GET" && item.path === "/api/events");
+  assert.ok(route);
+  const invalidQueries = [
+    "page=0",
+    "page=1.5",
+    "pageSize=49",
+    "sort=popular",
+    "type=SPORT",
+    "date=2030-02-31",
+    "upcoming=sometimes",
+    `q=${"x".repeat(101)}`,
+  ];
+  for (const query of invalidQueries) {
+    const url = new URL(`http://localhost/api/events?${query}`);
+    const response = await route.handler(new Request(url), {}, url);
+    assert.equal(response.status, 400, query);
+    const body = await response.json() as { error?: string };
+    assert.ok(body.error, query);
+  }
 });

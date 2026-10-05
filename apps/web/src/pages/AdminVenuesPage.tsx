@@ -1,6 +1,7 @@
 import type { VenueDto } from "@cinebook/shared";
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { api } from "../lib/api";
+import { AccessibleDialog } from "../components/AccessibleDialog";
 
 type CategoryDraft = { key: string; name: string; color: string; rows: string };
 const freshCategory = (name = "", color = "#39d7a1", rows = ""): CategoryDraft => ({ key: crypto.randomUUID(), name, color, rows });
@@ -54,11 +55,11 @@ export function AdminVenuesPage() {
     finally { setSaving(false); }
   }
 
-  async function removeVenue() {
+  async function archiveVenue() {
     if (!deleteTarget) return;
     setDeleting(true); setError("");
-    try { await api(`/api/venues/${deleteTarget.id}`, { method: "DELETE" }); setMessage("Venue deleted."); setDeleteTarget(null); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "Venue could not be deleted"); }
+    try { await api(`/api/admin/venues/${deleteTarget.id}/archive`, { method: "PATCH", body: JSON.stringify({ archived: !deleteTarget.archivedAt }) }); setMessage(deleteTarget.archivedAt ? "Venue restored." : "Venue archived."); setDeleteTarget(null); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : "Venue status could not be changed"); }
     finally { setDeleting(false); }
   }
 
@@ -78,9 +79,9 @@ export function AdminVenuesPage() {
           <button className="button button-primary full-button" type="submit" disabled={saving}>{saving ? "Saving layout…" : editingId ? "Update venue" : "Create venue"}</button>
         </form>
 
-        <section className="venue-list"><div className="panel-toolbar"><div><p className="kicker">Saved layouts</p><h2>Existing venues</h2></div></div>{loading ? <div className="workspace-skeleton" /> : venues.map((venue) => <article className="workspace-card venue-card" key={venue.id}><div className="venue-card-top"><div><span className={`workspace-chip ${venue._count.events ? "locked" : ""}`}>{venue._count.events ? "Layout locked" : "Editable"}</span><h3>{venue.name}</h3><p>{venue.city} · {venue.auditorium}</p><p>{venue.rows} rows × {venue.cols} seats · {venue.rows * venue.cols} total</p></div><strong>{venue._count.events}<small>events</small></strong></div><div className="venue-categories">{venue.categories.map((category) => <span key={category.id}><i style={{ backgroundColor: category.color }} />{category.name}</span>)}</div><footer><button type="button" disabled={Boolean(venue._count.events)} onClick={() => edit(venue)}>Edit layout</button><button type="button" className="danger-text" disabled={Boolean(venue._count.events)} onClick={() => setDeleteTarget(venue)}>Delete</button></footer></article>)}</section>
+        <section className="venue-list"><div className="panel-toolbar"><div><p className="kicker">Saved layouts</p><h2>Existing venues</h2></div></div>{loading ? <div className="workspace-skeleton" /> : venues.map((venue) => <article className={`workspace-card venue-card${venue.archivedAt ? " archived-card" : ""}`} key={venue.id}><div className="venue-card-top"><div><span className={`workspace-chip ${venue._count.events ? "locked" : ""}`}>{venue.archivedAt ? "Archived" : venue._count.events ? "Layout locked" : "Editable"}</span><h3>{venue.name}</h3><p>{venue.city} · {venue.auditorium}</p><p>{venue.rows} rows × {venue.cols} seats · {venue.rows * venue.cols} total</p></div><strong>{venue._count.events}<small>events</small></strong></div><div className="venue-categories">{venue.categories.map((category) => <span key={category.id}><i style={{ backgroundColor: category.color }} />{category.name}</span>)}</div><footer><button type="button" disabled={Boolean(venue._count.events) || Boolean(venue.archivedAt)} onClick={() => edit(venue)}>Edit layout</button><button type="button" className={venue.archivedAt ? "" : "danger-text"} onClick={() => setDeleteTarget(venue)}>{venue.archivedAt ? "Restore" : "Archive"}</button></footer></article>)}</section>
       </div>
-      {deleteTarget && <div className="dialog-backdrop" role="presentation"><section className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-venue-title"><span className="dialog-icon">!</span><h2 id="delete-venue-title">Delete {deleteTarget.name}?</h2><p>The venue, categories and seats will be removed permanently. This action cannot be undone.</p><div><button type="button" className="button button-ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>Keep venue</button><button type="button" className="button danger-button" disabled={deleting} onClick={removeVenue}>{deleting ? "Deleting…" : "Delete venue"}</button></div></section></div>}
+      {deleteTarget && <AccessibleDialog labelledBy="archive-venue-title" className="confirm-dialog" locked={deleting} onClose={() => setDeleteTarget(null)}><span className="dialog-icon" aria-hidden="true">!</span><h2 id="archive-venue-title">{deleteTarget.archivedAt ? "Restore" : "Archive"} {deleteTarget.name}?</h2><p>{deleteTarget.archivedAt ? "The venue will become available for new shows again." : "Existing shows and bookings remain intact, but organisers cannot schedule new shows here."}</p><div><button type="button" className="button button-ghost" disabled={deleting} onClick={() => setDeleteTarget(null)}>Cancel</button><button type="button" className={deleteTarget.archivedAt ? "button button-primary" : "button danger-button"} disabled={deleting} onClick={archiveVenue}>{deleting ? "Saving…" : deleteTarget.archivedAt ? "Restore venue" : "Archive venue"}</button></div></AccessibleDialog>}
     </section>
   );
 }

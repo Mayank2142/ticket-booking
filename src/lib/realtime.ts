@@ -91,6 +91,25 @@ export async function getRedisClient() {
   return connecting;
 }
 
+export async function getRedisDiagnostics() {
+  const configuredUrl = redisUrl();
+  if (!configuredUrl) return { configured: false, status: "disabled" as const, message: "Set REDIS_URL to enable local fan-out and shared rate limits", latencyMs: null, endpoint: null };
+  let endpoint = "configured";
+  try {
+    const parsed = new URL(configuredUrl);
+    endpoint = `${parsed.hostname}:${parsed.port || "6379"}`;
+  } catch { /* Keep credentials and malformed details out of diagnostics. */ }
+  const startedAt = Date.now();
+  try {
+    const client = await getRedisClient();
+    if (!client?.isReady) return { configured: true, status: "fallback" as const, message: "Redis is unavailable; database and in-process updates remain active", latencyMs: null, endpoint };
+    const pong = await client.ping();
+    return { configured: true, status: pong === "PONG" ? "connected" as const : "fallback" as const, message: pong === "PONG" ? "Redis fan-out and shared rate limits are active" : "Redis returned an unexpected health response", latencyMs: Date.now() - startedAt, endpoint };
+  } catch (error) {
+    return { configured: true, status: "fallback" as const, message: error instanceof Error ? error.message : "Redis diagnostics failed", latencyMs: null, endpoint };
+  }
+}
+
 export async function publishSeatUpdate(eventId: string, reason: SeatUpdateReason) {
   const update: SeatUpdate = {
     id: randomUUID(),

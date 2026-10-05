@@ -1,6 +1,5 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { NextRequest } from "next/server";
 import { Role } from "@/generated/prisma/client";
 import { db } from "./db";
 
@@ -29,13 +28,19 @@ export function signToken(user: AuthUser) {
   );
 }
 
-export function getToken(req: NextRequest) {
+export function getToken(req: Request) {
   const header = req.headers.get("authorization");
   if (header?.startsWith("Bearer ")) return header.slice(7);
-  return req.cookies.get("token")?.value ?? null;
+  const cookieHeader = req.headers.get("cookie");
+  if (!cookieHeader) return null;
+  const tokenCookie = cookieHeader
+    .split(";")
+    .map((cookie) => cookie.trim())
+    .find((cookie) => cookie.startsWith("token="));
+  return tokenCookie ? decodeURIComponent(tokenCookie.slice("token=".length)) : null;
 }
 
-export async function getUser(req: NextRequest): Promise<AuthUser | null> {
+export async function getUser(req: Request): Promise<AuthUser | null> {
   const token = getToken(req);
   if (!token) return null;
   try {

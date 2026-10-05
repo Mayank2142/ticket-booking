@@ -14,6 +14,25 @@ export function eventArtwork(type: string) {
   return type === "MOVIE" ? "/images/portal-poster.png" : "/images/cinema-hero.png";
 }
 
+const eventPosters: Record<string, string> = {
+  "Dune: Part Two": "/images/stitch/dune-part-two.jpg",
+  "Oppenheimer: 70mm": "/images/stitch/oppenheimer.jpg",
+  "Kalki 2898 AD": "/images/stitch/kalki-2898-ad.jpg",
+  "Interstellar: 10th Anniversary": "/images/stitch/interstellar.jpg",
+  "Coldplay: Music of the Spheres": "/images/stitch/coldplay.jpg",
+  "A.R. Rahman: Symphony Live": "/images/stitch/ar-rahman.jpg",
+  "Diljit Dosanjh: Dil-Luminati Tour": "/images/stitch/diljit.jpg"
+};
+
+export function eventPosterArtwork(event: { title: string; type: string }) {
+  return eventPosters[event.title] || eventArtwork(event.type);
+}
+
+export function eventHeroArtwork(event: { title: string; type: string; posterUrl?: string | null }) {
+  if (event.title === "Dune: Part Two") return "/images/stitch/hero-dune.jpg";
+  return event.posterUrl || eventPosterArtwork(event);
+}
+
 export function eventPresentation(type: string) {
   return type === "MOVIE"
     ? { genre: "Sci-fi · Adventure", duration: "2h 15m", language: "English", rating: "4.8" }

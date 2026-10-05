@@ -35,6 +35,25 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T;
 }
 
+export async function downloadApiFile(path: string, filename: string) {
+  const token = getToken();
+  const response = await fetch(`${API_URL}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({ error: "Download failed" })) as ApiErrorDto;
+    throw new Error(data.error || "Download failed");
+  }
+  const href = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  document.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(href);
+}
+
 export function apiUrl(path: string) {
   return `${API_URL}${path}`;
 }
