@@ -62,7 +62,7 @@ test("customer account exposes ticket groups, waitlists, preferences, and securi
   await page.getByRole("link", { name: "Waitlist", exact: true }).click();
   await expect(page.getByRole("heading", { name: "My waitlists" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Active waitlists & offers" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Waitlist history" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Waitlist history", exact: true })).toBeVisible();
 
   await page.getByRole("link", { name: "Hi, Customer" }).click();
   await expect(page.getByRole("heading", { name: "Profile & preferences" })).toBeVisible();
