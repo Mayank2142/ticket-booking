@@ -14,6 +14,7 @@ import {
 import { enqueueBackgroundJob, JOB_TYPES } from "./jobs";
 
 const alreadyDelivered = (message: string): EmailDeliveryResult => ({ delivered: true, mode: "smtp", message });
+const waitlistEmailsDisabled = (): EmailDeliveryResult => ({ delivered: false, mode: "skipped", message: "Customer disabled waitlist email notifications. Queue position and offers are unchanged." });
 
 export async function deliverBookingTicket(bookingId: string) {
   const booking = await db.booking.findUnique({ where: { id: bookingId }, include: { user: true, event: { include: { venue: true } }, seats: { include: { seat: true } } } });
@@ -45,6 +46,7 @@ export async function deliverBookingReminder(bookingId: string) {
 export async function deliverWaitlistJoined(entryId: string) {
   const entry = await db.waitlistEntry.findUnique({ where: { id: entryId }, include: { user: true, event: true, category: true } });
   if (!entry) throw new Error("Waitlist entry does not exist");
+  if (!entry.user.waitlistAlerts) return waitlistEmailsDisabled();
   if (entry.joinedEmailSentAt) return alreadyDelivered("Waitlist joined email was already delivered");
   const result = await sendWaitlistJoinedEmail({ to: entry.user.email, name: entry.user.name, eventTitle: entry.event.title, category: entry.category.name, relatedEntityId: entry.id });
   if (result.delivered) await db.waitlistEntry.update({ where: { id: entry.id }, data: { joinedEmailSentAt: new Date() } });
@@ -54,6 +56,7 @@ export async function deliverWaitlistJoined(entryId: string) {
 export async function deliverWaitlistOffer(entryId: string) {
   const entry = await db.waitlistEntry.findUnique({ where: { id: entryId }, include: { user: true, event: true, category: true } });
   if (!entry || entry.status !== WaitlistStatus.OFFERED || !entry.offerToken || !entry.offerExpiresAt || entry.offerExpiresAt <= new Date()) throw new Error("Waitlist offer is not eligible for email");
+  if (!entry.user.waitlistAlerts) return waitlistEmailsDisabled();
   if (entry.offerNotifiedAt) return alreadyDelivered("Waitlist offer email was already delivered");
   const webUrl = (process.env.WEB_URL ?? "http://localhost:5173").replace(/\/$/, "");
   const result = await sendWaitlistOfferEmail({ to: entry.user.email, name: entry.user.name, eventTitle: entry.event.title, category: entry.category.name, offerUrl: `${webUrl}/events/${entry.eventId}?offer=${entry.offerToken}`, expiresAt: entry.offerExpiresAt, relatedEntityId: entry.id });
@@ -64,6 +67,7 @@ export async function deliverWaitlistOffer(entryId: string) {
 export async function deliverWaitlistOfferExpired(entryId: string) {
   const entry = await db.waitlistEntry.findUnique({ where: { id: entryId }, include: { user: true, event: true, category: true } });
   if (!entry || entry.status !== WaitlistStatus.EXPIRED) throw new Error("Waitlist offer is not expired");
+  if (!entry.user.waitlistAlerts) return waitlistEmailsDisabled();
   if (entry.expiredEmailSentAt) return alreadyDelivered("Offer-expired email was already delivered");
   const result = await sendWaitlistOfferExpiredEmail({ to: entry.user.email, name: entry.user.name, eventTitle: entry.event.title, category: entry.category.name, relatedEntityId: entry.id });
   if (result.delivered) await db.waitlistEntry.update({ where: { id: entry.id }, data: { expiredEmailSentAt: new Date() } });

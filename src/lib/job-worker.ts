@@ -31,7 +31,7 @@ function parsePayload(payloadJson: string) {
 
 async function processNotification(resultPromise: Promise<EmailDeliveryResult>) {
   const result = await resultPromise;
-  if (!result.delivered && result.mode !== "preview") throw new Error(result.message);
+  if (!result.delivered && result.mode !== "preview" && result.mode !== "skipped") throw new Error(result.message);
   return result;
 }
 

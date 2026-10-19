@@ -6,7 +6,7 @@ import { sendResendMessage } from "./resend-email";
 
 export type EmailDeliveryResult = {
   delivered: boolean;
-  mode: "smtp" | "preview" | "resend";
+  mode: "smtp" | "preview" | "resend" | "skipped";
   message: string;
   previewId?: string;
 };

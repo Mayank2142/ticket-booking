@@ -9,10 +9,11 @@ import { expireStaleOffers, offerNextWaitlistForSeat } from "../../../../src/lib
 import { publishSeatUpdate } from "../../../../src/lib/realtime";
 import { normalizeEmail, validateName, validatePassword, ValidationError } from "../../../../src/lib/validation";
 import { FirebaseAuthError, verifyRecentFirebaseUser } from "../../../../src/lib/firebase-auth";
+import { emailVerificationDelivery } from "../../../../src/lib/email-verification-status";
 import type { RouteDefinition } from "../types";
 import { readJson } from "../types";
 
-function customerProfile(user: {
+async function customerProfile(user: {
   id: string;
   email: string;
   name: string;
@@ -23,6 +24,7 @@ function customerProfile(user: {
   firebaseUid?: string | null;
   firebaseProvider?: string | null;
   passwordLoginEnabled?: boolean;
+  emailVerificationTokenHash?: string | null;
 }) {
   return {
     id: user.id,
@@ -35,6 +37,7 @@ function customerProfile(user: {
     firebaseLinked: Boolean(user.firebaseUid),
     firebaseProvider: user.firebaseProvider ?? null,
     passwordLoginEnabled: user.passwordLoginEnabled ?? true,
+    emailVerificationDelivery: user.emailVerifiedAt ? undefined : await emailVerificationDelivery(user.id, user.emailVerificationTokenHash),
   };
 }
 
@@ -51,7 +54,7 @@ export const accountRoutes: RouteDefinition[] = [
       const auth = await authenticatedCustomer(request);
       if (!auth) return err("Forbidden", 403);
       const user = await db.user.findUnique({ where: { id: auth.id } });
-      return user ? ok({ user: customerProfile(user) }) : err("Account not found", 404);
+      return user ? ok({ user: await customerProfile(user) }) : err("Account not found", 404);
     },
   },
   {
@@ -94,7 +97,7 @@ export const accountRoutes: RouteDefinition[] = [
         return updated;
       });
       const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-      return ok({ user: customerProfile(user), token: signToken(authUser) });
+      return ok({ user: await customerProfile(user), token: signToken(authUser) });
     },
   },
   {
@@ -116,7 +119,7 @@ export const accountRoutes: RouteDefinition[] = [
         return "queued" as const;
       });
       if (result === "missing") return err("Account not found", 404);
-      return ok({ queued: result === "queued", verified: result === "verified" });
+      return ok({ queued: result === "queued", verified: result === "verified", delivery: result === "queued" ? await emailVerificationDelivery(auth.id, verificationTokenHash) : undefined });
     },
   },
   {

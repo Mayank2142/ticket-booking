@@ -21,7 +21,7 @@ export async function exchangeFirebaseIdentity(principal: FirebasePrincipal, lin
     const linked = await tx.user.findUnique({ where: { firebaseUid: principal.uid } });
     if (linked) {
       if (linked.email !== email || (linkingUserId && linkingUserId !== linked.id)) throw new FirebaseAuthError("This identity belongs to another CineBook account.", 409);
-      return linked;
+      return linked.emailVerifiedAt ? linked : tx.user.update({ where: { id: linked.id }, data: { emailVerifiedAt: new Date(), emailVerificationTokenHash: null, emailVerificationExpiresAt: null } });
     }
     const existing = await tx.user.findUnique({ where: { email } });
     if (existing) {

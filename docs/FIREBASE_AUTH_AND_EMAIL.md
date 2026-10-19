@@ -90,6 +90,12 @@ When configured, Resend is preferred over the existing SMTP transport. With neit
 
 Confirmation emails include event, venue, local show date/time, seats, total, booking reference, an authenticated booking-details link and a `ticket.png` QR attachment. Nothing is removed from **My Tickets**. Provider acceptance is not proof of inbox delivery. Failed delivery does not cancel a confirmed booking.
 
+Do not use `onboarding@resend.dev` as the public site's sender: Resend's test domain restricts normal recipients to the email associated with your Resend account. A valid API key alone does not enable customer email delivery. Verify a domain you control in Resend, then update `EMAIL_FROM` on both services to an address on that domain. Your Railway app subdomain is not a DNS domain you control.
+
+The account page shows the current verification request's queued, retrying, failed, preview-only or provider-accepted state. None of those states marks an email verified: the customer must open the verification link or explicitly link a verified Google identity using the same saved email. **Check verification status** refreshes that status without replacing unsaved profile preferences. Save an edited email before requesting a new link.
+
+The waitlist is a per-show, per-seat-category queue in position order. A released matching seat produces a temporary offer for the next customer, not an automatic booking. The customer must finish booking before the displayed expiry; expired offers pass the opportunity onwards. Disabling **Waitlist offer alerts** skips waitlist emails only; queue positions, offers and booking rules are unchanged and remain visible on **My waitlists**.
+
 `npm run email:verify` checks SMTP connectivity when using SMTP. For Resend it reports configuration only and intentionally does not send a message; perform the controlled booking test below.
 
 ## 5. Verification checklist

@@ -27,6 +27,12 @@ export type CustomerProfileDto = AuthUserDto & {
   firebaseLinked?: boolean;
   firebaseProvider?: string | null;
   passwordLoginEnabled?: boolean;
+  emailVerificationDelivery?: EmailVerificationDeliveryDto;
+};
+
+export type EmailVerificationDeliveryDto = {
+  state: "not_requested" | "queued" | "retrying" | "failed" | "preview" | "accepted";
+  message: string;
 };
 
 export type FirebasePublicConfigDto = { apiKey: string; authDomain: string; projectId: string; appId: string };

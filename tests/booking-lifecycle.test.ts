@@ -11,6 +11,7 @@ import { eventRoutes } from "../apps/api/src/routes/events";
 import { authRoutes } from "../apps/api/src/routes/auth";
 import { exchangeFirebaseIdentity } from "../src/lib/firebase-session";
 import type { FirebasePrincipal } from "../src/lib/firebase-auth";
+import { deliverWaitlistJoined, deliverWaitlistOffer, deliverWaitlistOfferExpired } from "../src/lib/delivery";
 import {
   cancelBooking,
   confirmBooking,
@@ -433,11 +434,60 @@ test("explicit Firebase linking preserves role, password and bookings and reject
   assert.equal(linked.role, Role.CUSTOMER);
   assert.equal(linked.password, password);
   assert.equal(linked.passwordLoginEnabled, true);
+  await db.user.update({ where: { id: linked.id }, data: { emailVerifiedAt: null } });
+  await assert.rejects(exchangeFirebaseIdentity({ ...principal, emailVerified: false }), /Verify your email/);
+  assert.ok((await exchangeFirebaseIdentity(principal)).emailVerifiedAt);
   assert.equal((await db.booking.findUniqueOrThrow({ where: { id: booking.id } })).userId, linked.id);
   const login = await callRoute(authRoutes, "POST", "/api/auth/login", "/api/auth/login", "", {}, { email: linked.email, password: "Original123" });
   assert.equal(login.status, 200);
   const privileged = await exchangeFirebaseIdentity({ ...principal, uid: `organiser-${scenario.organiser.id}`, email: scenario.organiser.email }, scenario.organiser.id);
   assert.equal(privileged.role, Role.ORGANISER);
+});
+
+test("verification status reports queue failures and previews without falsely verifying or exposing private job data", async () => {
+  const scenario = await createScenario();
+  const customer = scenario.users[0];
+  const token = signToken({ id: customer.id, name: customer.name, email: customer.email, role: customer.role });
+  const response = await callAccountRoute("POST", "/api/account/email-verification/resend", token);
+  const queued = await response.json();
+  assert.equal(queued.queued, true);
+  assert.equal(queued.delivery.state, "queued");
+  const user = await db.user.findUniqueOrThrow({ where: { id: customer.id } });
+  const job = await db.backgroundJob.findUniqueOrThrow({ where: { dedupeKey: `EMAIL_VERIFICATION:${user.id}:${user.emailVerificationTokenHash!.slice(0, 12)}` } });
+  for (const [status, resultJson, expected] of [
+    ["RETRY", "{}", "retrying"], ["FAILED", "{}", "failed"],
+    ["SUCCEEDED", JSON.stringify({ delivered: false, mode: "preview" }), "preview"],
+    ["SUCCEEDED", JSON.stringify({ delivered: true, mode: "resend" }), "accepted"],
+  ]) {
+    await db.backgroundJob.update({ where: { id: job.id }, data: { status, resultJson, lastError: "private SMTP diagnostic" } });
+    const profile = await (await callAccountRoute("GET", "/api/account", token)).json();
+    assert.equal(profile.user.emailVerificationDelivery.state, expected);
+    assert.equal(profile.user.emailVerifiedAt, null);
+    assert.doesNotMatch(JSON.stringify(profile), /private SMTP diagnostic|payloadJson|emailVerificationTokenHash/);
+    assert.doesNotMatch(JSON.stringify(profile), new RegExp(user.emailVerificationTokenHash!));
+  }
+  const payload = JSON.parse(job.payloadJson) as { token: string };
+  assert.equal((await callAccountRoute("POST", "/api/account/email-verification/confirm", "", { token: "forged".repeat(10) })).status, 410);
+  assert.equal((await callAccountRoute("POST", "/api/account/email-verification/confirm", "", { token: payload.token })).status, 200);
+  const verified = await (await callAccountRoute("GET", "/api/account", token)).json();
+  assert.ok(verified.user.emailVerifiedAt);
+});
+
+test("disabled waitlist emails do not send or create previews and do not change queue positions or offers", async () => {
+  const scenario = await createScenario();
+  await db.user.update({ where: { id: scenario.users[1].id }, data: { waitlistAlerts: false } });
+  const entry = await joinWaitlist(scenario, 1, 7);
+  assert.equal((await deliverWaitlistJoined(entry.id)).mode, "skipped");
+  const offered = await offerNextWaitlistForSeat(scenario.event.id, scenario.seats[0].id);
+  assert.ok(offered);
+  assert.equal((await deliverWaitlistOffer(entry.id)).mode, "skipped");
+  const active = await db.waitlistEntry.findUniqueOrThrow({ where: { id: entry.id } });
+  assert.equal(active.position, 7);
+  assert.equal(active.status, WaitlistStatus.OFFERED);
+  assert.equal(active.offerNotifiedAt, null);
+  await db.waitlistEntry.update({ where: { id: entry.id }, data: { status: WaitlistStatus.EXPIRED } });
+  assert.equal((await deliverWaitlistOfferExpired(entry.id)).mode, "skipped");
+  assert.equal(await db.emailPreview.count({ where: { relatedEntityId: entry.id } }), 0);
 });
 
 test("a deleted Firebase identity cannot recreate its account while provider cleanup is pending", async () => {
