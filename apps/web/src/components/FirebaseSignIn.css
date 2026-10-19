@@ -1,7 +1,17 @@
-.firebase-sign-in { margin-block: 20px; min-width: 0; }
-.firebase-sign-in__hint, .firebase-sign-in__divider { color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
-.firebase-sign-in summary { color: var(--color-text-strong); cursor: pointer; font-size: 14px; padding-block: 12px; }
-.firebase-sign-in summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
-.firebase-sign-in .auth-form { margin-block: 12px; }
-.firebase-sign-in__divider { text-align: center; border-top: 1px solid var(--color-border); padding-top: 16px; margin-top: 20px; }
-.firebase-sign-in .button { white-space: normal; }
+.firebase-sign-in { margin-block: 24px 0; min-width: 0; }
+.google-sign-in-button {
+  width: 100%; min-height: 46px; display: flex; align-items: center; justify-content: center;
+  gap: 12px; padding: 12px 16px; border: 1px solid #8eb1ed; border-radius: 6px;
+  background: #fff; color: #1f1f1f; font: 500 14px/20px var(--font-body); cursor: pointer;
+}
+.google-sign-in-button img { display: block; flex: 0 0 20px; object-fit: contain; }
+.google-sign-in-button:hover:not(:disabled) { background: #f5f8ff; border-color: #4285f4; }
+.google-sign-in-button:disabled { cursor: wait; opacity: .65; }
+.firebase-sign-in__hint, .auth-email-hint { color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
+.auth-method-divider { display: flex; align-items: center; gap: 16px; margin-top: 22px; color: var(--color-text-muted); font-size: 11px; font-weight: 500; letter-spacing: .06em; }
+.auth-method-divider::before, .auth-method-divider::after { content: ""; height: 1px; flex: 1; background: var(--color-border); }
+.auth-panel .firebase-sign-in + .auth-form { margin-top: 22px; }
+.auth-email-fields { display: grid; gap: 18px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.auth-email-reset { justify-self: end; padding: 0; border: 0; background: transparent; color: var(--color-primary); font: 600 12px/1.5 var(--font-body); text-align: right; cursor: pointer; }
+.auth-email-reset:disabled { cursor: wait; opacity: .65; }
+.auth-email-hint { margin: 0; }

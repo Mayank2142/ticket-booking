@@ -1,4 +1,4 @@
-import type { FirebasePublicConfigDto } from "@cinebook/shared";
+import type { AuthUserDto, FirebasePublicConfigDto } from "@cinebook/shared";
 import { api } from "./api";
 
 let configRequest: Promise<FirebasePublicConfigDto | null> | undefined;
@@ -29,14 +29,39 @@ export function firebaseErrorMessage(error: unknown) {
     "auth/unauthorized-domain": "This website domain must be added to Firebase Authentication's authorised domains.",
     "auth/operation-not-allowed": "Enable this sign-in method in Firebase Authentication first.",
     "auth/configuration-not-found": "Open Authentication in the Firebase Console, choose Get started, then enable Google and Email/Password sign-in.",
-    "auth/email-already-in-use": "This email already has a Firebase account. Use verified-email sign-in or reset its password.",
-    "auth/invalid-credential": "Email or password is incorrect. Existing demo accounts use the original login form.",
+    "auth/email-already-in-use": "This email already has an account. Log in or reset your verified-email password.",
+    "auth/invalid-credential": "Email or password is incorrect. Please try again.",
     "auth/weak-password": "Choose a stronger password with at least eight characters, a letter and a number.",
     "auth/network-request-failed": "Firebase could not be reached. Check your connection and try again.",
     "auth/too-many-requests": "Too many attempts. Please wait before trying again.",
     "auth/account-exists-with-different-credential": "Use the sign-in method already linked to this email.",
   };
   return messages[code] ?? (error instanceof Error ? error.message : "Sign-in could not be completed.");
+}
+
+type FirebaseSession = { token: string; user: AuthUserDto };
+
+export async function signInWithVerifiedEmail(email: string, password: string): Promise<FirebaseSession> {
+  const { auth, sdk } = await firebaseClient();
+  try {
+    const result = await sdk.signInWithEmailAndPassword(auth, email.trim(), password);
+    if (!result.user.emailVerified) {
+      await sdk.sendEmailVerification(result.user);
+      throw new Error("Check your inbox for the verification link, then sign in here with the same email and password.");
+    }
+    return await api<FirebaseSession>("/api/auth/firebase", {
+      method: "POST", body: JSON.stringify({ idToken: await result.user.getIdToken(true) }),
+    });
+  } finally { await sdk.signOut(auth); }
+}
+
+export async function registerVerifiedEmail(name: string, email: string, password: string) {
+  const { auth, sdk } = await firebaseClient();
+  try {
+    const result = await sdk.createUserWithEmailAndPassword(auth, email.trim(), password);
+    await sdk.updateProfile(result.user, { displayName: name.trim() });
+    await sdk.sendEmailVerification(result.user);
+  } finally { await sdk.signOut(auth); }
 }
 
 export async function confirmFirebaseIdentity(email: string, provider: string | null | undefined, password: string) {

@@ -5,6 +5,7 @@ import { useAuth } from "../auth/AuthContext";
 import loginCinema from "../assets/cinebook-login-cinema.png";
 import { clearFieldError, FieldError, fieldErrorProps, validateForm, type FieldErrors } from "../components/FormValidation";
 import { FirebaseSignIn } from "../components/FirebaseSignIn";
+import { firebaseErrorMessage, getFirebaseConfig, registerVerifiedEmail } from "../lib/firebase";
 
 type RegistrationRole = Extract<UserRole, "CUSTOMER" | "ORGANISER">;
 
@@ -13,6 +14,8 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [googleBusy, setGoogleBusy] = useState(false);
+  const [notice, setNotice] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
 
@@ -22,23 +25,33 @@ export function RegisterPage() {
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setNotice("");
     const nextErrors = validateForm(event.currentTarget, {
       password: (value) => /[A-Za-z]/.test(value) && /\d/.test(value) ? null : "Password must include at least one letter and one number.",
     });
     setFieldErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     setSubmitting(true);
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     try {
-      const createdUser = await register({
+      const input = {
         name: String(form.get("name") ?? ""),
         email: String(form.get("email") ?? ""),
         password: String(form.get("password") ?? ""),
         role: String(form.get("role") ?? "CUSTOMER") as RegistrationRole
-      });
+      };
+      if (input.role === "CUSTOMER" && await getFirebaseConfig()) {
+        await registerVerifiedEmail(input.name, input.email, input.password);
+        setNotice("Check your inbox and verify your email, then log in with the same email and password.");
+        const passwordInput = formElement.elements.namedItem("password");
+        if (passwordInput instanceof HTMLInputElement) passwordInput.value = "";
+        return;
+      }
+      const createdUser = await register(input);
       navigate(createdUser.role === "ORGANISER" ? "/organiser/events" : "/", { replace: true });
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Registration failed");
+      setError(firebaseErrorMessage(reason));
     } finally {
       setSubmitting(false);
     }
@@ -50,14 +63,17 @@ export function RegisterPage() {
         <p className="kicker">Join CineBook</p>
         <h1 id="register-title">Create your account</h1>
         <p className="auth-intro">Reserve exact seats, receive QR passes, and never miss a cancellation.</p>
-        <FirebaseSignIn mode="register" onComplete={(signedIn) => navigate(signedIn.role === "ADMIN" ? "/admin" : signedIn.role === "ORGANISER" ? "/organiser/events" : "/", { replace: true })} />
-        <form className="auth-form" onSubmit={onSubmit} onInput={(event) => clearFieldError(event, setFieldErrors)} noValidate>
+        <FirebaseSignIn mode="register" disabled={submitting} onBusyChange={setGoogleBusy} onComplete={(signedIn) => navigate(signedIn.role === "ADMIN" ? "/admin" : signedIn.role === "ORGANISER" ? "/organiser/events" : "/", { replace: true })} />
+        <form className="auth-form" aria-busy={submitting || googleBusy} onSubmit={onSubmit} onInput={(event) => clearFieldError(event, setFieldErrors)} noValidate>
+          <fieldset className="auth-email-fields" disabled={submitting || googleBusy}>
           <label><span>Full name</span><input className="form-control" name="name" required minLength={2} maxLength={80} autoComplete="name" placeholder="Your name" {...fieldErrorProps(fieldErrors, "name")} /><FieldError errors={fieldErrors} name="name" /></label>
           <label><span>Email address</span><input className="form-control" name="email" type="email" required autoComplete="email" placeholder="you@example.com" {...fieldErrorProps(fieldErrors, "email")} /><FieldError errors={fieldErrors} name="email" /></label>
           <label><span>Password</span><div className="password-field"><input className="form-control" name="password" type={showPassword ? "text" : "password"} minLength={8} maxLength={128} required autoComplete="new-password" placeholder="At least 8 characters" {...fieldErrorProps(fieldErrors, "password")} /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button></div><small>Use at least 8 characters with a letter and a number.</small><FieldError errors={fieldErrors} name="password" /></label>
           <label><span>I want to</span><select className="form-control" name="role" defaultValue="CUSTOMER" {...fieldErrorProps(fieldErrors, "role")}><option value="CUSTOMER">Book tickets</option><option value="ORGANISER">Create and manage events</option></select><FieldError errors={fieldErrors} name="role" /></label>
+          {notice && <p className="form-message" role="status">{notice} <Link to="/login">Go to login</Link></p>}
           {error && <p className="form-message error" role="alert">{error}</p>}
           <button className="button button-primary submit-button" type="submit" disabled={submitting}>{submitting ? "Creating account…" : "Create account"}</button>
+          </fieldset>
         </form>
         <p className="auth-switch">Already a member? <Link to="/login">Log in</Link></p>
       </div>

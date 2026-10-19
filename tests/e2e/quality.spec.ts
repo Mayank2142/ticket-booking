@@ -4,7 +4,7 @@ async function login(page: Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Email address").fill(email);
   await page.locator('input[name="password"]').fill("password123");
-  await page.getByRole("button", { name: "Log in securely" }).click();
+  await page.getByRole("button", { name: "Continue with Email" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
 }
 

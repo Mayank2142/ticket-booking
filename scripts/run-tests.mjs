@@ -40,6 +40,7 @@ run([
   "tests/realtime.test.ts",
   "tests/jobs-notifications.test.ts",
   "tests/security.test.ts",
+  "tests/email-sign-in.test.ts",
   "tests/scaling.test.ts",
 ]);
 

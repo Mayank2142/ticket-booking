@@ -19,7 +19,7 @@ test("login updates the navigation immediately and favourites remain interactive
   await page.goto("/login");
   await page.getByLabel("Email address").fill("customer@demo.com");
   await page.locator('input[name="password"]').fill("password123");
-  await page.getByRole("button", { name: "Log in securely" }).click();
+  await page.getByRole("button", { name: "Continue with Email" }).click();
 
   await expect(page.getByRole("link", { name: "Hi, Customer" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
@@ -51,7 +51,7 @@ test("customer account exposes ticket groups, waitlists, preferences, and securi
   await page.goto("/login");
   await page.getByLabel("Email address").fill("customer@demo.com");
   await page.locator('input[name="password"]').fill("password123");
-  await page.getByRole("button", { name: "Log in securely" }).click();
+  await page.getByRole("button", { name: "Continue with Email" }).click();
   await expect(page.getByRole("link", { name: "Hi, Customer" })).toBeVisible();
 
   await page.goto("/bookings");

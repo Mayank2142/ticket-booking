@@ -41,4 +41,5 @@ run([
   "tests/catalog.test.ts",
   "tests/realtime.test.ts",
   "tests/security.test.ts",
+  "tests/email-sign-in.test.ts",
 ]);

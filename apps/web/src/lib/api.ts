@@ -4,6 +4,13 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const TOKEN_KEY = "cinebook:token";
 export const AUTH_UNAUTHORIZED_EVENT = "cinebook:unauthorized";
 
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
@@ -30,7 +37,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     if (response.status === 401) window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
     const message = typeof data === "object" && data !== null && "error" in data ? data.error : "Request failed";
-    throw new Error(message);
+    throw new ApiError(message, response.status);
   }
   return data as T;
 }

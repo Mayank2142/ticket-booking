@@ -3,6 +3,8 @@
 ## What changes and what stays
 
 - Existing customer, administrator and organiser password logins are retained.
+- Login and registration each have one email form, alongside a Google-branded button. Email login first checks the existing CineBook account; only a normal credential rejection can proceed to configured Firebase email sign-in. Network failures, throttling and server errors never trigger provider fallback. Valid existing logins never send their password to Firebase.
+- When Firebase is configured, the single customer registration form sends the Firebase verification email; organiser registration retains its original CineBook workflow. Without Firebase configuration, the original local registration remains available. Password resets for verified-email accounts use the same email field; no second form is shown.
 - Google and Firebase email/password sign-in are additional options, enabled only when all required server configuration is present.
 - New Firebase identities always create **CUSTOMER** accounts. Client-supplied roles and Firebase custom roles are not used to grant CineBook privileges.
 - Existing email accounts are not merged automatically. Sign in using the original password, then use **Account → Optional Google sign-in** with the same email to link them. Existing bookings, favourites, passwords and roles remain on the original account.

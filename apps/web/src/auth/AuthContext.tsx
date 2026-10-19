@@ -1,6 +1,8 @@
 import type { AuthUserDto, UserRole } from "@cinebook/shared";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, AUTH_UNAUTHORIZED_EVENT, clearToken, getToken, setToken } from "../lib/api";
+import { api, ApiError, AUTH_UNAUTHORIZED_EVENT, clearToken, getToken, setToken } from "../lib/api";
+import { getFirebaseConfig, signInWithVerifiedEmail } from "../lib/firebase";
+import { signInWithEmail } from "./email-sign-in";
 
 type RegisterInput = {
   name: string;
@@ -49,9 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    const result = await api<{ token: string; user: AuthUserDto }>("/api/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password })
+    const result = await signInWithEmail(email, password, {
+      existingAccount: (address, secret) => api<{ token: string; user: AuthUserDto }>("/api/auth/login", {
+        method: "POST", body: JSON.stringify({ email: address, password: secret }),
+      }),
+      verifiedEmail: signInWithVerifiedEmail,
+      verifiedEmailEnabled: async () => Boolean(await getFirebaseConfig()),
+      invalidCredentials: (error) => error instanceof ApiError && error.status === 401,
     });
     setToken(result.token);
     setUser(result.user);
