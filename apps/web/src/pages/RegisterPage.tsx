@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import loginCinema from "../assets/cinebook-login-cinema.png";
 import { clearFieldError, FieldError, fieldErrorProps, validateForm, type FieldErrors } from "../components/FormValidation";
+import { FirebaseSignIn } from "../components/FirebaseSignIn";
 
 type RegistrationRole = Extract<UserRole, "CUSTOMER" | "ORGANISER">;
 
@@ -49,6 +50,7 @@ export function RegisterPage() {
         <p className="kicker">Join CineBook</p>
         <h1 id="register-title">Create your account</h1>
         <p className="auth-intro">Reserve exact seats, receive QR passes, and never miss a cancellation.</p>
+        <FirebaseSignIn mode="register" onComplete={(signedIn) => navigate(signedIn.role === "ADMIN" ? "/admin" : signedIn.role === "ORGANISER" ? "/organiser/events" : "/", { replace: true })} />
         <form className="auth-form" onSubmit={onSubmit} onInput={(event) => clearFieldError(event, setFieldErrors)} noValidate>
           <label><span>Full name</span><input className="form-control" name="name" required minLength={2} maxLength={80} autoComplete="name" placeholder="Your name" {...fieldErrorProps(fieldErrors, "name")} /><FieldError errors={fieldErrors} name="name" /></label>
           <label><span>Email address</span><input className="form-control" name="email" type="email" required autoComplete="email" placeholder="you@example.com" {...fieldErrorProps(fieldErrors, "email")} /><FieldError errors={fieldErrors} name="email" /></label>

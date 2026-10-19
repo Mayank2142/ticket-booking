@@ -4,6 +4,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import loginCinema from "../assets/cinebook-login-cinema.png";
 import { clearFieldError, FieldError, fieldErrorProps, validateForm, type FieldErrors } from "../components/FormValidation";
+import { FirebaseSignIn } from "../components/FirebaseSignIn";
 
 function roleDestination(role: UserRole) {
   if (role === "ADMIN") return "/admin";
@@ -56,6 +57,7 @@ export function LoginPage() {
         <p className="kicker">Member access</p>
         <h1 id="login-title">Log in to CineBook</h1>
         <p className="auth-intro">Use your account to continue booking securely.</p>
+        <FirebaseSignIn onComplete={(signedIn) => navigate(safeDestination(searchParams.get("next"), roleDestination(signedIn.role)), { replace: true })} />
         <form className="auth-form" onSubmit={onSubmit} onInput={(event) => clearFieldError(event, setFieldErrors)} noValidate>
           <label><span>Email address</span><input className="form-control" name="email" type="email" required autoComplete="email" placeholder="you@example.com" {...fieldErrorProps(fieldErrors, "email")} /><FieldError errors={fieldErrors} name="email" /></label>
           <label><span>Password</span><div className="password-field"><input className="form-control" name="password" type={showPassword ? "text" : "password"} required autoComplete="current-password" placeholder="Enter your password" {...fieldErrorProps(fieldErrors, "password")} /><button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? "Hide" : "Show"}</button></div><FieldError errors={fieldErrors} name="password" /></label>

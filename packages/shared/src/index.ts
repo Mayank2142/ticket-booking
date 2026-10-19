@@ -24,7 +24,12 @@ export type CustomerProfileDto = AuthUserDto & {
   reminderEmails: boolean;
   waitlistAlerts: boolean;
   emailVerifiedAt: string | null;
+  firebaseLinked?: boolean;
+  firebaseProvider?: string | null;
+  passwordLoginEnabled?: boolean;
 };
+
+export type FirebasePublicConfigDto = { apiKey: string; authDomain: string; projectId: string; appId: string };
 
 export type VenueCategoryDto = {
   id: string;

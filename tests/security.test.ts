@@ -6,6 +6,21 @@ import {
   resetLocalRateLimitsForTests,
 } from "../src/lib/rate-limit";
 import { eventRoutes, parseEventListQuery } from "../apps/api/src/routes/events";
+import { authRoutes } from "../apps/api/src/routes/auth";
+import { firebasePublicConfig } from "../src/lib/firebase-auth";
+
+test("Firebase configuration does not expose server credentials and missing tokens cannot authenticate", async () => {
+  const config = firebasePublicConfig();
+  if (config) assert.deepEqual(Object.keys(config).sort(), ["apiKey", "appId", "authDomain", "projectId"]);
+  const route = authRoutes.find((item) => item.path === "/api/auth/firebase");
+  assert.ok(route);
+  for (const body of [{ role: "ADMIN" }, { idToken: "", role: "ADMIN" }, { idToken: "x".repeat(17000) }]) {
+    const url = new URL("http://localhost/api/auth/firebase");
+    const result = await route.handler(new Request(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), {}, url);
+    assert.equal(result.status, 400);
+    assert.equal("token" in await result.json(), false);
+  }
+});
 
 test.beforeEach(() => {
   resetLocalRateLimitsForTests();

@@ -202,6 +202,12 @@ Start the worker separately. Use PostgreSQL for production or multi-worker booki
 - Without SMTP, branded HTML/text emails are saved in the database. Sign in as the administrator and inspect Operations for previews and jobs.
 - For external delivery, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` and a verified `SMTP_FROM`. Run `npm run email:verify`, then restart services. No email account or SMTP credentials are bundled.
 
+### Optional: Firebase Google/verified-email sign-in and HTTPS ticket emails
+
+Firebase sign-in is additive: original customer, organiser and administrator password accounts stay supported. New Firebase accounts are customers; existing accounts require explicit same-email linking rather than automatic merging. Booking tickets stay in My Tickets and can also be sent with a QR attachment through Resend's HTTPS API (suitable where Railway blocks SMTP).
+
+See **[Firebase and email setup](docs/FIREBASE_AUTH_AND_EMAIL.md)** for provider/domain configuration, private server credentials, additive migrations, email sender verification and the real-inbox test checklist. These integrations are not active merely because the code is installed; they require the specified Firebase and email-provider configuration.
+
 ### Run the compiled application
 
 After database setup:

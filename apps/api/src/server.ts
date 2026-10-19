@@ -18,6 +18,7 @@ import { Router } from "./router";
 import { safeError, structuredLog } from "../../../src/lib/observability";
 import { cachedPublicResponse } from "../../../src/lib/http-cache";
 import { beginRequest, endRequest } from "../../../src/lib/runtime-metrics";
+import { firebasePublicConfig } from "../../../src/lib/firebase-auth";
 
 const router = new Router()
   .addAll(authRoutes)
@@ -165,10 +166,11 @@ function applyCommonHeaders(outgoing: ServerResponse, request: Request, requestI
   outgoing.setHeader("X-Frame-Options", "DENY");
   outgoing.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   outgoing.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  outgoing.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  const firebase = firebasePublicConfig();
+  outgoing.setHeader("Cross-Origin-Opener-Policy", firebase ? "same-origin-allow-popups" : "same-origin");
   outgoing.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' https: wss:"
+    `default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self'; img-src 'self' data: blob: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'${firebase ? " https://apis.google.com" : ""}; connect-src 'self' https: wss:; frame-src 'self'${firebase ? ` https://${firebase.authDomain} https://accounts.google.com https://apis.google.com` : ""}`
   );
   if (process.env.NODE_ENV === "production") {
     outgoing.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");

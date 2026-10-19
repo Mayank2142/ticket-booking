@@ -2,10 +2,11 @@ import nodemailer from "nodemailer";
 import { db } from "./db";
 import { renderNotificationEmail, type NotificationKind } from "./email-templates";
 import { bookingQrDataUrl } from "./qr";
+import { sendResendMessage } from "./resend-email";
 
 export type EmailDeliveryResult = {
   delivered: boolean;
-  mode: "smtp" | "preview";
+  mode: "smtp" | "preview" | "resend";
   message: string;
   previewId?: string;
 };
@@ -34,6 +35,8 @@ async function sendBrandedEmail(options: {
   actionUrl?: string;
   expiresAt?: Date;
   showtime?: string;
+  venueName?: string;
+  totalAmount?: number;
   qrBookingRef?: string;
 }) {
   const template = renderNotificationEmail(options);
@@ -48,7 +51,8 @@ async function sendBrandedEmail(options: {
     },
   });
   const transport = await getTransport();
-  if (!transport) {
+  const useResend = Boolean(process.env.RESEND_API_KEY);
+  if (!transport && !useResend) {
     console.log("[email:preview]", { id: preview.id, kind: template.kind, to: options.to, subject: template.subject });
     return { delivered: false, mode: "preview", previewId: preview.id, message: "Local email preview created" } satisfies EmailDeliveryResult;
   }
@@ -57,7 +61,14 @@ async function sendBrandedEmail(options: {
     const attachments = options.qrBookingRef
       ? [{ filename: "ticket.png", content: (await bookingQrDataUrl(options.qrBookingRef)).split(",")[1], encoding: "base64" as const }]
       : undefined;
-    await transport.sendMail({
+    if (useResend) {
+      const from = process.env.EMAIL_FROM;
+      if (!from) throw new Error("EMAIL_FROM must be a verified sender for Resend.");
+      await sendResendMessage({ from, to: options.to, subject: template.subject, text: template.text, html: template.html,
+        attachments: attachments?.map((item) => ({ filename: item.filename, content: item.content })) }, process.env.RESEND_API_KEY!);
+      return { delivered: true, mode: "resend", previewId: preview.id, message: "Email accepted by Resend; recipient delivery can be inspected in the provider dashboard" } satisfies EmailDeliveryResult;
+    }
+    await transport!.sendMail({
       from: process.env.SMTP_FROM ?? "tickets@example.com",
       to: options.to,
       subject: template.subject,
@@ -69,11 +80,11 @@ async function sendBrandedEmail(options: {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Email delivery failed";
     console.error("[email:error] Delivery failed", { kind: options.kind, to: options.to, message });
-    return { delivered: false, mode: "smtp", previewId: preview.id, message } satisfies EmailDeliveryResult;
+    return { delivered: false, mode: useResend ? "resend" : "smtp", previewId: preview.id, message } satisfies EmailDeliveryResult;
   }
 }
 
-export async function sendTicketEmail(opts: { to: string; name: string; eventTitle: string; bookingRef: string; seats: string[]; relatedEntityId?: string }) {
+export async function sendTicketEmail(opts: { to: string; name: string; eventTitle: string; bookingRef: string; seats: string[]; relatedEntityId?: string; showtime?: string; venueName?: string; totalAmount?: number; actionUrl?: string }) {
   return sendBrandedEmail({ kind: "BOOKING_CONFIRMATION", ...opts, qrBookingRef: opts.bookingRef });
 }
 
@@ -114,6 +125,10 @@ export async function sendAlertSubscriptionEmail(email: string) {
 }
 
 export async function verifyEmailTransport() {
+  if (process.env.RESEND_API_KEY) {
+    if (!process.env.EMAIL_FROM) return { configured: false, verified: false, mode: "resend" as const, message: "EMAIL_FROM is required for Resend" };
+    return { configured: true, verified: false, mode: "resend" as const, message: "Resend HTTPS delivery is configured. Verify delivery using a booking to your own real email and the Resend dashboard; this connectivity command does not send a message." };
+  }
   const transport = await getTransport();
   if (!transport) return { configured: false, verified: false, mode: "preview" as const, message: "SMTP is not configured; local preview mode is active" };
   try {

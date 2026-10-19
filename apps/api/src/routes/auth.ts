@@ -4,6 +4,8 @@ import { getUser, hashPassword, signToken, verifyPassword } from "../../../../sr
 import { db } from "../../../../src/lib/db";
 import { enforceRateLimit } from "../../../../src/lib/rate-limit";
 import { enqueueBackgroundJob, JOB_TYPES } from "../../../../src/lib/jobs";
+import { FirebaseAuthError, firebasePublicConfig, verifyFirebaseIdToken } from "../../../../src/lib/firebase-auth";
+import { exchangeFirebaseIdentity } from "../../../../src/lib/firebase-session";
 import {
   normalizeEmail,
   validateName,
@@ -15,6 +17,26 @@ import type { RouteDefinition } from "../types";
 import { readJson } from "../types";
 
 export const authRoutes: RouteDefinition[] = [
+  { method: "GET", path: "/api/auth/providers", handler: () => ok({ firebase: firebasePublicConfig() }) },
+  {
+    method: "POST", path: "/api/auth/firebase",
+    async handler(request) {
+      const limited = await enforceRateLimit(request, { scope: "firebase-login", limit: 20, windowMs: 15 * 60_000 });
+      if (limited) return limited;
+      const body = await readJson<{ idToken?: unknown; link?: unknown }>(request);
+      if (typeof body?.idToken !== "string" || !body.idToken || body.idToken.length > 16_384) return err("A valid Firebase ID token is required");
+      const current = body.link === true ? await getUser(request) : null;
+      if (body.link === true && !current) return err("Log in to your existing account before linking Google.", 401);
+      try {
+        const principal = await verifyFirebaseIdToken(body.idToken);
+        const user = await exchangeFirebaseIdentity(principal, current?.id);
+        const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
+        return ok({ token: signToken(authUser), user: authUser });
+      } catch (error) {
+        return err(error instanceof FirebaseAuthError ? error.message : "Firebase sign-in could not be completed. Please try again.", error instanceof FirebaseAuthError ? error.status : 409);
+      }
+    },
+  },
   {
     method: "POST",
     path: "/api/auth/login",
@@ -33,7 +55,7 @@ export const authRoutes: RouteDefinition[] = [
       if (typeof body.password !== "string" || !body.password) return err("Invalid credentials", 401);
 
       const user = await db.user.findUnique({ where: { email } });
-      if (!user || !(await verifyPassword(body.password, user.password))) return err("Invalid credentials", 401);
+      if (!user || !user.passwordLoginEnabled || !(await verifyPassword(body.password, user.password))) return err("Invalid credentials", 401);
       const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
       return ok({ token: signToken(authUser), user: authUser });
     },

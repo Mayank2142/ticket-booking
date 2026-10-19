@@ -8,6 +8,9 @@ import { organiserRoutes } from "../apps/api/src/routes/organiser";
 import { adminRoutes } from "../apps/api/src/routes/admin";
 import { catalogueRoutes } from "../apps/api/src/routes/catalogue";
 import { eventRoutes } from "../apps/api/src/routes/events";
+import { authRoutes } from "../apps/api/src/routes/auth";
+import { exchangeFirebaseIdentity } from "../src/lib/firebase-session";
+import type { FirebasePrincipal } from "../src/lib/firebase-auth";
 import {
   cancelBooking,
   confirmBooking,
@@ -401,4 +404,46 @@ test("movie discovery paginates unique content and details expose every publishe
   const details = await detailsResponse.json();
   assert.equal(details.event.showtimes.length, 15);
   assert.equal(details.event.showtimes.at(-1).date, "2099-01-15");
+});
+
+test("verified Firebase identities create customers and never auto-link an existing privileged email", async () => {
+  const scenario = await createScenario();
+  const principal: FirebasePrincipal = { uid: `new-${scenario.organiser.id}`, email: "firebase-new@example.com", emailVerified: true, name: "Firebase Customer", provider: "google.com", authTime: Date.now() / 1000 };
+  const customer = await exchangeFirebaseIdentity(principal);
+  assert.equal(customer.role, Role.CUSTOMER);
+  assert.equal(customer.passwordLoginEnabled, false);
+  assert.ok(customer.emailVerifiedAt);
+  assert.equal((await exchangeFirebaseIdentity(principal)).id, customer.id);
+  await assert.rejects(exchangeFirebaseIdentity({ ...principal, uid: "unverified", emailVerified: false }), /Verify your email/);
+  await assert.rejects(exchangeFirebaseIdentity({ ...principal, provider: "anonymous" }), /Verify your email/);
+  await assert.rejects(exchangeFirebaseIdentity({ ...principal, uid: "different", email: scenario.organiser.email }), /existing password/);
+  assert.equal((await db.user.findUniqueOrThrow({ where: { id: scenario.organiser.id } })).firebaseUid, null);
+});
+
+test("explicit Firebase linking preserves role, password and bookings and rejects stale/wrong-account proof", async () => {
+  const scenario = await createScenario();
+  const password = await hashPassword("Original123");
+  await db.user.update({ where: { id: scenario.users[0].id }, data: { password } });
+  const booking = await bookSeat(scenario);
+  const principal: FirebasePrincipal = { uid: `linked-${scenario.users[0].id}`, email: scenario.users[0].email, emailVerified: true, provider: "google.com", authTime: Date.now() / 1000 };
+  await assert.rejects(exchangeFirebaseIdentity(principal, scenario.users[1].id), /existing password/);
+  await assert.rejects(exchangeFirebaseIdentity({ ...principal, authTime: Date.now() / 1000 - 600 }, scenario.users[0].id), /again/);
+  const linked = await exchangeFirebaseIdentity(principal, scenario.users[0].id);
+  assert.equal(linked.id, scenario.users[0].id);
+  assert.equal(linked.role, Role.CUSTOMER);
+  assert.equal(linked.password, password);
+  assert.equal(linked.passwordLoginEnabled, true);
+  assert.equal((await db.booking.findUniqueOrThrow({ where: { id: booking.id } })).userId, linked.id);
+  const login = await callRoute(authRoutes, "POST", "/api/auth/login", "/api/auth/login", "", {}, { email: linked.email, password: "Original123" });
+  assert.equal(login.status, 200);
+  const privileged = await exchangeFirebaseIdentity({ ...principal, uid: `organiser-${scenario.organiser.id}`, email: scenario.organiser.email }, scenario.organiser.id);
+  assert.equal(privileged.role, Role.ORGANISER);
+});
+
+test("a deleted Firebase identity cannot recreate its account while provider cleanup is pending", async () => {
+  const scenario = await createScenario();
+  const uid = `deleted-${scenario.organiser.id}`;
+  await db.backgroundJob.create({ data: { type: "FIREBASE_USER_DELETE", dedupeKey: `firebase-delete:${uid}`, payloadJson: JSON.stringify({ uid }) } });
+  await assert.rejects(exchangeFirebaseIdentity({ uid, email: "deleted@example.com", emailVerified: true, provider: "google.com", authTime: Date.now() / 1000 }), /deleted/);
+  assert.equal(await db.user.count({ where: { email: "deleted@example.com" } }), 0);
 });

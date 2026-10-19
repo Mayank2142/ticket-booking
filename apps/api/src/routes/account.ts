@@ -8,6 +8,7 @@ import { enqueueBackgroundJob, JOB_TYPES } from "../../../../src/lib/jobs";
 import { expireStaleOffers, offerNextWaitlistForSeat } from "../../../../src/lib/seats";
 import { publishSeatUpdate } from "../../../../src/lib/realtime";
 import { normalizeEmail, validateName, validatePassword, ValidationError } from "../../../../src/lib/validation";
+import { FirebaseAuthError, verifyRecentFirebaseUser } from "../../../../src/lib/firebase-auth";
 import type { RouteDefinition } from "../types";
 import { readJson } from "../types";
 
@@ -19,6 +20,9 @@ function customerProfile(user: {
   reminderEmails: boolean;
   waitlistAlerts: boolean;
   emailVerifiedAt: Date | null;
+  firebaseUid?: string | null;
+  firebaseProvider?: string | null;
+  passwordLoginEnabled?: boolean;
 }) {
   return {
     id: user.id,
@@ -28,6 +32,9 @@ function customerProfile(user: {
     reminderEmails: user.reminderEmails,
     waitlistAlerts: user.waitlistAlerts,
     emailVerifiedAt: user.emailVerifiedAt,
+    firebaseLinked: Boolean(user.firebaseUid),
+    firebaseProvider: user.firebaseProvider ?? null,
+    passwordLoginEnabled: user.passwordLoginEnabled ?? true,
   };
 }
 
@@ -75,6 +82,7 @@ export const accountRoutes: RouteDefinition[] = [
       if (duplicate) return err("Email already registered", 409);
 
       const emailChanged = email !== auth.email;
+      if (emailChanged && (await db.user.findUnique({ where: { id: auth.id }, select: { firebaseUid: true } }))?.firebaseUid) return err("Email changes for linked Firebase accounts must be verified through the sign-in provider first.", 409);
       const verificationToken = emailChanged ? randomBytes(32).toString("hex") : null;
       const verificationTokenHash = verificationToken ? createHash("sha256").update(verificationToken).digest("hex") : null;
       const user = await db.$transaction(async (transaction) => {
@@ -143,6 +151,7 @@ export const accountRoutes: RouteDefinition[] = [
         return err(error instanceof ValidationError ? error.message : "Invalid password");
       }
       const user = await db.user.findUnique({ where: { id: auth.id } });
+      if (user && !user.passwordLoginEnabled) return err("This account uses Firebase sign-in. Manage its password through Firebase or Google.", 409);
       if (!user || !(await verifyPassword(body.currentPassword, user.password))) return err("Current password is incorrect", 401);
       if (await verifyPassword(newPassword, user.password)) return err("Choose a password different from your current password");
       await db.user.update({ where: { id: auth.id }, data: { password: await hashPassword(newPassword) } });
@@ -157,10 +166,14 @@ export const accountRoutes: RouteDefinition[] = [
       if (!auth) return err("Forbidden", 403);
       const limited = await enforceRateLimit(request, { scope: "account-delete", limit: 3, windowMs: 60 * 60_000 }, auth.id);
       if (limited) return limited;
-      const body = await readJson<{ password?: unknown }>(request);
-      if (!body || typeof body.password !== "string") return err("Password is required");
+      const body = await readJson<{ password?: unknown; firebaseIdToken?: unknown }>(request);
+      if (!body) return err("Confirm your identity before deleting your account");
       const user = await db.user.findUnique({ where: { id: auth.id } });
-      if (!user || !(await verifyPassword(body.password, user.password))) return err("Password is incorrect", 401);
+      if (!user) return err("Account not found", 404);
+      if (!user.passwordLoginEnabled && user.firebaseUid) {
+        try { await verifyRecentFirebaseUser(body.firebaseIdToken, user.firebaseUid); }
+        catch (error) { return err(error instanceof FirebaseAuthError ? error.message : "Identity confirmation failed", 401); }
+      } else if (typeof body.password !== "string" || !(await verifyPassword(body.password, user.password))) return err("Password is incorrect", 401);
 
       const [heldSeats, futureBookings] = await Promise.all([
         db.showSeat.findMany({ where: { heldById: auth.id, status: SeatStatus.HELD }, select: { eventId: true, seatId: true } }),
@@ -175,6 +188,7 @@ export const accountRoutes: RouteDefinition[] = [
       ];
 
       await db.$transaction(async (transaction) => {
+        if (user.firebaseUid) await enqueueBackgroundJob({ type: JOB_TYPES.FIREBASE_USER_DELETE, payload: { uid: user.firebaseUid }, dedupeKey: `firebase-delete:${user.firebaseUid}` }, transaction);
         await transaction.showSeat.updateMany({
           where: { heldById: auth.id, status: SeatStatus.HELD },
           data: { status: SeatStatus.AVAILABLE, heldById: null, heldUntil: null, version: { increment: 1 } },

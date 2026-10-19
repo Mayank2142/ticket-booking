@@ -16,8 +16,10 @@ import {
   type BackgroundJobType,
 } from "./jobs";
 import { runMaintenanceCycle } from "./maintenance";
+import { deleteFirebaseIdentity } from "./firebase-auth";
+import type { EmailDeliveryResult } from "./email";
 
-type JobPayload = { id?: string; userId?: string; token?: string };
+type JobPayload = { id?: string; userId?: string; token?: string; uid?: string };
 
 function parsePayload(payloadJson: string) {
   try {
@@ -27,14 +29,18 @@ function parsePayload(payloadJson: string) {
   }
 }
 
-async function processNotification(resultPromise: Promise<{ delivered: boolean; mode: "smtp" | "preview"; message: string; previewId?: string }>) {
+async function processNotification(resultPromise: Promise<EmailDeliveryResult>) {
   const result = await resultPromise;
-  if (!result.delivered && result.mode === "smtp") throw new Error(result.message);
+  if (!result.delivered && result.mode !== "preview") throw new Error(result.message);
   return result;
 }
 
 async function processJob(type: BackgroundJobType, payload: JobPayload) {
   switch (type) {
+    case JOB_TYPES.FIREBASE_USER_DELETE:
+      if (!payload.uid) throw new Error("Firebase identity deletion job is missing its uid");
+      await deleteFirebaseIdentity(payload.uid);
+      return { deleted: true };
     case JOB_TYPES.MAINTENANCE:
       return runMaintenanceCycle();
     case JOB_TYPES.EMAIL_VERIFICATION:

@@ -16,10 +16,10 @@ import { enqueueBackgroundJob, JOB_TYPES } from "./jobs";
 const alreadyDelivered = (message: string): EmailDeliveryResult => ({ delivered: true, mode: "smtp", message });
 
 export async function deliverBookingTicket(bookingId: string) {
-  const booking = await db.booking.findUnique({ where: { id: bookingId }, include: { user: true, event: true, seats: { include: { seat: true } } } });
+  const booking = await db.booking.findUnique({ where: { id: bookingId }, include: { user: true, event: { include: { venue: true } }, seats: { include: { seat: true } } } });
   if (!booking || booking.status !== BookingStatus.CONFIRMED) throw new Error("Booking is not eligible for confirmation email");
   if (booking.ticketEmailSentAt) return alreadyDelivered("Ticket email was already delivered");
-  const result = await sendTicketEmail({ to: booking.user.email, name: booking.user.name, eventTitle: booking.event.title, bookingRef: booking.ref, seats: booking.seats.map(({ seat }) => seat.label), relatedEntityId: booking.id });
+  const result = await sendTicketEmail({ to: booking.user.email, name: booking.user.name, eventTitle: booking.event.title, bookingRef: booking.ref, seats: booking.seats.map(({ seat }) => seat.label), relatedEntityId: booking.id, showtime: `${booking.event.date} ${booking.event.time} (venue local time)`, venueName: `${booking.event.venue.name}, ${booking.event.venue.city}`, totalAmount: booking.totalAmount, actionUrl: `${(process.env.WEB_URL ?? "http://localhost:5173").replace(/\/$/, "")}/bookings/${booking.id}` });
   await db.booking.update({ where: { id: booking.id }, data: { ticketEmailAttempts: { increment: 1 }, ticketEmailLastError: result.delivered || result.mode === "preview" ? null : result.message, ...(result.delivered ? { ticketEmailSentAt: new Date() } : {}) } });
   return result;
 }

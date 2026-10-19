@@ -16,6 +16,7 @@ const env = {
   SMTP_HOST: "",
   SMTP_USER: "",
   SMTP_PASS: "",
+  RESEND_API_KEY: "",
   REDIS_URL: "",
 };
 

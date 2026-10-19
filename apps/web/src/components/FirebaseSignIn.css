@@ -1,0 +1,7 @@
+.firebase-sign-in { margin-block: 20px; min-width: 0; }
+.firebase-sign-in__hint, .firebase-sign-in__divider { color: var(--color-text-muted); font-size: 13px; line-height: 1.6; }
+.firebase-sign-in summary { color: var(--color-text-strong); cursor: pointer; font-size: 14px; padding-block: 12px; }
+.firebase-sign-in summary:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 4px; }
+.firebase-sign-in .auth-form { margin-block: 12px; }
+.firebase-sign-in__divider { text-align: center; border-top: 1px solid var(--color-border); padding-top: 16px; margin-top: 20px; }
+.firebase-sign-in .button { white-space: normal; }

@@ -25,6 +25,8 @@ type TemplateInput = {
   actionUrl?: string;
   expiresAt?: Date;
   showtime?: string;
+  venueName?: string;
+  totalAmount?: number;
 };
 
 function escapeHtml(value: string) {
@@ -60,7 +62,7 @@ export function renderNotificationEmail(input: TemplateInput): EmailTemplate {
     case "EMAIL_VERIFICATION":
       return compose(input.kind, "Verify your CineBook email", "Verify your email", `Hi ${name}, confirm this email address to secure your CineBook account.`, [], input.actionUrl ? { label: "Verify email", url: input.actionUrl } : undefined);
     case "BOOKING_CONFIRMATION":
-      return compose(input.kind, `Ticket confirmed: ${eventTitle}`, "Your booking is confirmed", `Hi ${name}, your seats are reserved and your QR ticket is ready.`, [`Event: ${eventTitle}`, `Booking: ${input.bookingRef ?? "—"}`, `Seats: ${seats}`]);
+      return compose(input.kind, `Ticket confirmed: ${eventTitle}`, "Your booking is confirmed", `Hi ${name}, your seats are reserved and your QR ticket is attached.`, [`Event: ${eventTitle}`, `Booking: ${input.bookingRef ?? "—"}`, `Seats: ${seats}`, ...(input.showtime ? [`Date & time: ${input.showtime}`] : []), ...(input.venueName ? [`Venue: ${input.venueName}`] : []), ...(input.totalAmount !== undefined ? [`Total: ₹${input.totalAmount}`] : [])], input.actionUrl ? { label: "View your ticket", url: input.actionUrl } : undefined);
     case "BOOKING_CANCELLATION":
       return compose(input.kind, `Booking cancelled: ${eventTitle}`, "Your booking was cancelled", `Hi ${name}, we have cancelled this booking and released its seats.`, [`Event: ${eventTitle}`, `Booking: ${input.bookingRef ?? "—"}`, `Released seats: ${seats}`]);
     case "WAITLIST_JOINED":

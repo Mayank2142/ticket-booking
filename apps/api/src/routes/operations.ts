@@ -57,6 +57,7 @@ export const operationRoutes: RouteDefinition[] = [
         database: "checking",
         redis: process.env.REDIS_URL ? "checking" : "disabled",
         smtp: process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS ? "configured" : "unconfigured",
+        email: process.env.RESEND_API_KEY && process.env.EMAIL_FROM ? "resend-configured" : process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS ? "smtp-configured" : "preview",
       };
       try {
         await withTimeout(db.$queryRaw`SELECT 1`, 3_000);
