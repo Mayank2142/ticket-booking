@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   checkRateLimit,
@@ -8,6 +9,11 @@ import {
 import { eventRoutes, parseEventListQuery } from "../apps/api/src/routes/events";
 import { authRoutes } from "../apps/api/src/routes/auth";
 import { firebasePublicConfig } from "../src/lib/firebase-auth";
+
+test("web HTML does not add a second CSP that blocks configured Firebase scripts and frames", async () => {
+  const html = await readFile(new URL("../apps/web/index.html", import.meta.url), "utf8");
+  assert.doesNotMatch(html, /<meta\b[^>]*http-equiv\s*=\s*["']Content-Security-Policy["']/i);
+});
 
 test("Firebase configuration does not expose server credentials and missing tokens cannot authenticate", async () => {
   const config = firebasePublicConfig();

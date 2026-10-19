@@ -38,6 +38,8 @@ Never prefix the Admin credentials with `VITE_` or place them in frontend files.
 
 Run `npm run firebase:verify` in the service console to check Admin credentials and Firebase Auth read access without creating users or printing credential values. This is not a substitute for completing Google sign-in and email verification with your own test account.
 
+The API's HTTP Content-Security-Policy header is the production policy source of truth. Do not add a second restrictive CSP meta tag in the web entry HTML: browsers enforce both policies, so an older `script-src 'self'` meta policy blocks Google's authentication helper even when the server permits it. Check the browser console for CSP violations if Google sign-in reports `auth/internal-error`.
+
 ## 3. Apply the additive database migration
 
 The migration adds nullable identity fields and enables password login for all existing accounts by default. It does not reset or seed customer data.
