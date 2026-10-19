@@ -97,7 +97,7 @@ export function EventPage() {
       }, 120);
     };
 
-    const source = new EventSource(apiUrl(`/api/events/${eventId}/stream`));
+    const source = new EventSource(apiUrl(`/api/events/${eventId}/stream`), { withCredentials: true });
     source.onopen = () => setRealtimeStatus("live");
     source.addEventListener("inventory", refresh);
     source.onerror = () => setRealtimeStatus("fallback");

@@ -12,6 +12,7 @@ export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [cities, setCities] = useState<string[]>([]);
+  const [logoutError, setLogoutError] = useState("");
   const [city, setCity] = useState(() => window.localStorage.getItem("cinebook:city") || "ALL");
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     const saved = window.localStorage.getItem("cinebook:theme");
@@ -35,9 +36,10 @@ export function AppLayout() {
     setCity(new URLSearchParams(location.search).get("city") || "ALL");
   }, [location.pathname, location.search]);
 
-  function onLogout() {
-    logout();
-    navigate("/");
+  async function onLogout() {
+    setLogoutError("");
+    try { await logout(); navigate("/"); }
+    catch { setLogoutError("Could not sign out. Check your connection and try again."); }
   }
 
   function changeCity(nextCity: string) {
@@ -67,6 +69,7 @@ export function AppLayout() {
         onLogout={onLogout}
       />
       <MobileNavigation user={user} loading={loading} cities={cities} city={city} onCityChange={changeCity} />
+      {logoutError && <p className="form-message error" role="alert">{logoutError}</p>}
       <main id="main-content" tabIndex={-1}><Outlet /></main>
       <SiteFooter cities={cities} />
     </div>

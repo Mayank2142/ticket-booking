@@ -1,7 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { BookingStatus, Role, SeatStatus } from "../../../../src/generated/prisma/client";
 import { err, ok } from "../../../../src/lib/api";
-import { getUser, hashPassword, requireRole, signToken, verifyPassword } from "../../../../src/lib/auth";
+import { getUser, hashPassword, requireRole, sessionCookie, verifyPassword } from "../../../../src/lib/auth";
+import { authenticatedResponse } from "../../../../src/lib/auth-response";
 import { db } from "../../../../src/lib/db";
 import { enforceRateLimit } from "../../../../src/lib/rate-limit";
 import { enqueueBackgroundJob, JOB_TYPES } from "../../../../src/lib/jobs";
@@ -97,7 +98,7 @@ export const accountRoutes: RouteDefinition[] = [
         return updated;
       });
       const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-      return ok({ user: await customerProfile(user), token: signToken(authUser) });
+      return authenticatedResponse(request, authUser, { user: await customerProfile(user) });
     },
   },
   {
@@ -157,8 +158,8 @@ export const accountRoutes: RouteDefinition[] = [
       if (user && !user.passwordLoginEnabled) return err("This account uses Firebase sign-in. Manage its password through Firebase or Google.", 409);
       if (!user || !(await verifyPassword(body.currentPassword, user.password))) return err("Current password is incorrect", 401);
       if (await verifyPassword(newPassword, user.password)) return err("Choose a password different from your current password");
-      await db.user.update({ where: { id: auth.id }, data: { password: await hashPassword(newPassword) } });
-      return ok({ changed: true });
+      const updated = await db.user.update({ where: { id: auth.id }, data: { password: await hashPassword(newPassword) } });
+      return authenticatedResponse(request, { id: updated.id, email: updated.email, name: updated.name, role: updated.role }, { changed: true });
     },
   },
   {
@@ -210,7 +211,7 @@ export const accountRoutes: RouteDefinition[] = [
       });
       for (const eventId of new Set(releasedSeats.map((seat) => seat.eventId))) void publishSeatUpdate(eventId, "released");
       for (const { eventId, seatId } of releasedSeats) await offerNextWaitlistForSeat(eventId, seatId);
-      return ok({ deleted: true });
+      return Response.json({ deleted: true }, { headers: { "Set-Cookie": sessionCookie("", true), "Cache-Control": "no-store" } });
     },
   },
   {

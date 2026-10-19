@@ -27,6 +27,9 @@ export function validatePassword(value: unknown) {
   if (!/[A-Za-z]/.test(value) || !/\d/.test(value)) {
     throw new ValidationError("Password must contain at least one letter and one number");
   }
+  if (Buffer.byteLength(value, "utf8") > 72) {
+    throw new ValidationError("Password must be no more than 72 UTF-8 bytes; some characters use multiple bytes.");
+  }
   return value;
 }
 

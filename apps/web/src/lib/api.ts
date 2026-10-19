@@ -11,27 +11,21 @@ export class ApiError extends Error {
   }
 }
 
-export function getToken() {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
 export function clearToken() {
+  // Remove credentials left by older builds. New sessions live only in HttpOnly cookies.
   localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("cinebook-alert-email");
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken();
+  const headers = new Headers(init?.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("X-CineBook-Session", "cookie");
   const response = await fetch(`${API_URL}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init?.headers
-    }
+    credentials: "include",
+    cache: "no-store",
+    headers,
   });
   const data: T | ApiErrorDto = await response.json();
   if (!response.ok) {
@@ -43,9 +37,9 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export async function downloadApiFile(path: string, filename: string) {
-  const token = getToken();
   const response = await fetch(`${API_URL}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined
+    credentials: "include",
+    headers: { "X-CineBook-Session": "cookie" },
   });
   if (!response.ok) {
     const data = await response.json().catch(() => ({ error: "Download failed" })) as ApiErrorDto;

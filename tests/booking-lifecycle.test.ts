@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { after, beforeEach, test } from "node:test";
 import { BookingStatus, EventType, Role, SeatStatus, ShowStatus, WaitlistStatus } from "../src/generated/prisma/client";
 import { db } from "../src/lib/db";
-import { hashPassword, signToken, verifyPassword } from "../src/lib/auth";
+import { getUser, hashPassword, sessionCookieName, signToken, verifyPassword } from "../src/lib/auth";
+import jwt from "jsonwebtoken";
+import { bookingRoutes } from "../apps/api/src/routes/bookings";
 import { accountRoutes } from "../apps/api/src/routes/account";
 import { organiserRoutes } from "../apps/api/src/routes/organiser";
 import { adminRoutes } from "../apps/api/src/routes/admin";
@@ -184,7 +186,7 @@ test("customers can update preferences, change password, and delete their accoun
   const user = await db.user.create({
     data: { name: "Profile Customer", email: "profile@test.dev", password: await hashPassword(password), role: Role.CUSTOMER },
   });
-  const token = signToken({ id: user.id, email: user.email, name: user.name, role: user.role });
+  let token = await signToken({ id: user.id, email: user.email, name: user.name, role: user.role });
 
   const updateResponse = await callAccountRoute("PATCH", "/api/account", token, {
     name: "Updated Customer",
@@ -193,6 +195,7 @@ test("customers can update preferences, change password, and delete their accoun
     waitlistAlerts: true,
   });
   assert.equal(updateResponse.status, 200);
+  token = (await updateResponse.json()).token;
   const updated = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   assert.equal(updated.name, "Updated Customer");
   assert.equal(updated.reminderEmails, false);
@@ -200,12 +203,84 @@ test("customers can update preferences, change password, and delete their accoun
   const newPassword = "newPass456";
   const passwordResponse = await callAccountRoute("POST", "/api/account/password", token, { currentPassword: password, newPassword });
   assert.equal(passwordResponse.status, 200);
+  token = (await passwordResponse.json()).token;
   const secured = await db.user.findUniqueOrThrow({ where: { id: user.id } });
   assert.equal(await verifyPassword(newPassword, secured.password), true);
 
   const deleteResponse = await callAccountRoute("DELETE", "/api/account", token, { password: newPassword });
   assert.equal(deleteResponse.status, 200);
   assert.equal(await db.user.findUnique({ where: { id: user.id } }), null);
+});
+
+test("browser login returns only a protected cookie and public identity fields, and logout expires it", async () => {
+  const password = "PrivateLogin123";
+  const user = await db.user.create({ data: { name: "Secure Customer", email: "secure-login@test.dev", password: await hashPassword(password), role: Role.CUSTOMER } });
+  const route = authRoutes.find((candidate) => candidate.path === "/api/auth/login")!;
+  const request = new Request("http://localhost/api/auth/login", { method: "POST", headers: { "content-type": "application/json", "x-cinebook-session": "cookie" }, body: JSON.stringify({ email: user.email, password }) });
+  const response = await route.handler(request, {}, new URL(request.url));
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  const body = await response.json();
+  assert.equal(body.token, "");
+  assert.deepEqual(Object.keys(body.user).sort(), ["email", "id", "name", "role"]);
+  const cookie = response.headers.get("set-cookie")!;
+  assert.match(cookie, /HttpOnly/); assert.match(cookie, /SameSite=Strict/);
+  assert.equal((await getUser(new Request("http://localhost/api/auth/me", { headers: { cookie: cookie.split(";")[0] } })))?.id, user.id);
+  const logout = authRoutes.find((candidate) => candidate.path === "/api/auth/logout")!;
+  const loggedOut = await logout.handler(new Request("http://localhost/api/auth/logout", { method: "POST" }), {}, new URL("http://localhost/api/auth/logout"));
+  assert.match(loggedOut.headers.get("set-cookie")!, /Max-Age=0/);
+});
+
+test("password, email, role and Firebase-identity changes invalidate previously issued sessions", async () => {
+  const user = await db.user.create({ data: { name: "Session Customer", email: "secure-session@test.dev", password: await hashPassword("PrivatePass123"), role: Role.CUSTOMER } });
+  const request = (token: string) => new Request("http://localhost/api/account", { headers: { authorization: `Bearer ${token}` } });
+  for (const update of [{ password: await hashPassword("ChangedPass123") }, { email: "changed-session@test.dev" }, { role: Role.ORGANISER }, { firebaseUid: "linked-test-identity" }]) {
+    const token = await signToken(user);
+    assert.ok(await getUser(request(token)));
+    const claims = jwt.decode(token) as jwt.JwtPayload;
+    assert.equal(claims.exp! - claims.iat!, 8 * 3600);
+    assert.equal(claims.email, undefined); assert.equal(claims.password, undefined); assert.equal(claims.role, undefined);
+    await db.user.update({ where: { id: user.id }, data: update });
+    assert.equal(await getUser(request(token)), null);
+    assert.ok(await getUser(request(await signToken(user))));
+  }
+  const currentToken = await signToken(user);
+  const claims = jwt.decode(currentToken) as jwt.JwtPayload;
+  const wrongAlgorithm = jwt.sign({ sub: user.id, sv: claims.sv }, process.env.JWT_SECRET!, { algorithm: "HS384", issuer: "cinebook", audience: "cinebook-api" });
+  assert.equal(await getUser(request(wrongAlgorithm)), null);
+  const legacy = jwt.sign({ sub: user.id, role: Role.ADMIN }, process.env.JWT_SECRET!);
+  assert.equal(await getUser(request(legacy)), null);
+  assert.equal(await getUser(new Request("http://localhost/api/account", { headers: { cookie: `${sessionCookieName()}=%not-valid-encoding` } })), null);
+});
+
+test("booking responses cannot expose password hashes or internal verification and Firebase fields", async () => {
+  const scenario = await createScenario();
+  const user = scenario.users[0];
+  await db.user.update({ where: { id: user.id }, data: { emailVerificationTokenHash: "private-verification-hash", firebaseUid: "private-firebase-uid" } });
+  await holdSeats(scenario.event.id, [scenario.seats[0].id], user.id);
+  const response = await callRoute(eventRoutes, "POST", "/api/events/:id/book", `/api/events/${scenario.event.id}/book`, await signToken(user), { id: scenario.event.id }, { seatIds: [scenario.seats[0].id] });
+  assert.equal(response.status, 201);
+  const body = await response.json();
+  assert.deepEqual(Object.keys(body.booking.user).sort(), ["email", "id", "name"]);
+  assert.doesNotMatch(JSON.stringify(body), /hashed-password|private-verification-hash|private-firebase-uid|emailVerificationTokenHash|passwordLoginEnabled/);
+  const stranger = scenario.users[1];
+  const strangerToken = await signToken(stranger);
+  const denied = await callRoute(bookingRoutes, "GET", "/api/bookings/:id", `/api/bookings/${body.booking.id}`, strangerToken, { id: body.booking.id });
+  assert.equal(denied.status, 404);
+  const cannotCancel = await callRoute(bookingRoutes, "DELETE", "/api/bookings/:id", `/api/bookings/${body.booking.id}`, strangerToken, { id: body.booking.id });
+  assert.notEqual(cannotCancel.status, 200);
+  const noAdmin = await callRoute(adminRoutes, "GET", "/api/admin/users", "/api/admin/users", strangerToken, {});
+  assert.equal(noAdmin.status, 403);
+});
+
+test("per-account brute-force limits cannot be bypassed by changing forwarded IP headers", async () => {
+  const route = authRoutes.find((candidate) => candidate.path === "/api/auth/login")!;
+  const email = `brute-force-${Date.now()}@test.dev`;
+  for (let attempt = 0; attempt < 21; attempt++) {
+    const request = new Request("http://localhost/api/auth/login", { method: "POST", headers: { "content-type": "application/json", "x-forwarded-for": `203.0.113.${attempt}` }, body: JSON.stringify({ email, password: "WrongPass123" }) });
+    const response = await route.handler(request, {}, new URL(request.url));
+    assert.equal(response.status, attempt < 20 ? 401 : 429);
+  }
 });
 
 test("cancellation is idempotent and creates only one waitlist offer", async () => {
@@ -300,7 +375,7 @@ test("concurrent seat offers claim distinct waiting customers", async () => {
 test("organisers cannot manage shows owned by another organiser", async () => {
   const scenario = await createScenario();
   const outsider = await db.user.create({ data: { name: "Outsider", email: "outsider@test.dev", password: "hash", role: Role.ORGANISER } });
-  const token = signToken({ id: outsider.id, name: outsider.name, email: outsider.email, role: outsider.role });
+  const token = await signToken({ id: outsider.id, name: outsider.name, email: outsider.email, role: outsider.role });
   const response = await callRoute(organiserRoutes, "GET", "/api/organiser/events/:id/manage", `/api/organiser/events/${scenario.event.id}/manage`, token, { id: scenario.event.id });
   assert.equal(response.status, 404);
 });
@@ -308,7 +383,7 @@ test("organisers cannot manage shows owned by another organiser", async () => {
 test("organiser cancellation atomically cancels bookings, releases inventory, and audits the action", async () => {
   const scenario = await createScenario();
   const booking = await bookSeat(scenario);
-  const token = signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
+  const token = await signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
   const response = await callRoute(organiserRoutes, "PUT", "/api/organiser/events/:id/status", `/api/organiser/events/${scenario.event.id}/status`, token, { id: scenario.event.id }, { status: ShowStatus.CANCELLED });
   assert.equal(response.status, 200);
   assert.equal((await db.booking.findUniqueOrThrow({ where: { id: booking.id } })).status, BookingStatus.CANCELLED);
@@ -318,7 +393,7 @@ test("organiser cancellation atomically cancels bookings, releases inventory, an
 
 test("organisers can create several shows for one content item in one workflow", async () => {
   const scenario = await createScenario();
-  const token = signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
+  const token = await signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
   const response = await callRoute(organiserRoutes, "POST", "/api/organiser/events/:id/shows", `/api/organiser/events/${scenario.event.id}/shows`, token, { id: scenario.event.id }, { shows: [
     { venueId: scenario.venue.id, auditoriumId: scenario.auditorium.id, date: "2099-01-02", time: "18:00", status: ShowStatus.DRAFT, prices: [{ categoryId: scenario.category.id, price: 600 }] },
     { venueId: scenario.venue.id, auditoriumId: scenario.auditorium.id, date: "2099-01-03", time: "20:00", status: ShowStatus.PUBLISHED, prices: [{ categoryId: scenario.category.id, price: 700 }] }
@@ -330,11 +405,11 @@ test("organisers can create several shows for one content item in one workflow",
 
 test("administrators manage cities and roles while organiser access remains forbidden", async () => {
   const scenario = await createScenario();
-  const organiserToken = signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
+  const organiserToken = await signToken({ id: scenario.organiser.id, name: scenario.organiser.name, email: scenario.organiser.email, role: scenario.organiser.role });
   const forbidden = await callRoute(adminRoutes, "GET", "/api/admin/users", "/api/admin/users", organiserToken, {});
   assert.equal(forbidden.status, 403);
   const adminUser = await db.user.create({ data: { name: "Admin", email: "admin@test.dev", password: "hash", role: Role.ADMIN } });
-  const adminToken = signToken({ id: adminUser.id, name: adminUser.name, email: adminUser.email, role: adminUser.role });
+  const adminToken = await signToken({ id: adminUser.id, name: adminUser.name, email: adminUser.email, role: adminUser.role });
   const cityResponse = await callRoute(adminRoutes, "POST", "/api/admin/cities", "/api/admin/cities", adminToken, {}, { name: "Bengaluru" });
   assert.equal(cityResponse.status, 201);
   const roleResponse = await callRoute(adminRoutes, "PATCH", "/api/admin/users/:id/role", `/api/admin/users/${scenario.users[1].id}/role`, adminToken, { id: scenario.users[1].id }, { role: Role.ORGANISER });
@@ -346,7 +421,7 @@ test("administrators manage cities and roles while organiser access remains forb
 test("venue administration archives used layouts instead of deleting them", async () => {
   const scenario = await createScenario();
   const adminUser = await db.user.create({ data: { name: "Admin", email: "admin2@test.dev", password: "hash", role: Role.ADMIN } });
-  const token = signToken({ id: adminUser.id, name: adminUser.name, email: adminUser.email, role: adminUser.role });
+  const token = await signToken({ id: adminUser.id, name: adminUser.name, email: adminUser.email, role: adminUser.role });
   const response = await callRoute(adminRoutes, "PATCH", "/api/admin/venues/:id/archive", `/api/admin/venues/${scenario.venue.id}/archive`, token, { id: scenario.venue.id }, { archived: true });
   assert.equal(response.status, 200);
   assert.ok((await db.venue.findUniqueOrThrow({ where: { id: scenario.venue.id } })).archivedAt);
@@ -360,7 +435,7 @@ test("email alerts persist and favourites return saved event cards", async () =>
   assert.equal(await db.alertSubscription.count({ where: { email: "alerts@example.com", active: true } }), 1);
 
   await db.favourite.create({ data: { userId: scenario.users[0].id, contentId: scenario.content.id } });
-  const token = signToken({ id: scenario.users[0].id, name: scenario.users[0].name, email: scenario.users[0].email, role: scenario.users[0].role });
+  const token = await signToken({ id: scenario.users[0].id, name: scenario.users[0].name, email: scenario.users[0].email, role: scenario.users[0].role });
   const favouriteResponse = await callRoute(catalogueRoutes, "GET", "/api/favourites", "/api/favourites", token, {});
   assert.equal(favouriteResponse.status, 200);
   const payload = await favouriteResponse.json() as { events: Array<{ title: string; isFavourite: boolean }> };
@@ -447,7 +522,7 @@ test("explicit Firebase linking preserves role, password and bookings and reject
 test("verification status reports queue failures and previews without falsely verifying or exposing private job data", async () => {
   const scenario = await createScenario();
   const customer = scenario.users[0];
-  const token = signToken({ id: customer.id, name: customer.name, email: customer.email, role: customer.role });
+  const token = await signToken({ id: customer.id, name: customer.name, email: customer.email, role: customer.role });
   const response = await callAccountRoute("POST", "/api/account/email-verification/resend", token);
   const queued = await response.json();
   assert.equal(queued.queued, true);

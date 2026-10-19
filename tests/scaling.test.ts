@@ -55,3 +55,11 @@ test("runtime load shedding bounds concurrent work and records rejections", () =
   assert.equal(runtimeMetrics().inFlight, 0);
   resetRuntimeMetricsForTests();
 });
+
+test("cookie-authenticated reads never enter or reuse the shared public cache", async () => {
+  clearPublicCache();
+  const request = new Request("http://localhost/api/events", { headers: { cookie: "cinebook_session=private-token" } });
+  const result = await cachedPublicResponse(request, "/api/events", async () => Response.json({ isFavourite: true }));
+  assert.equal(result.source, "BYPASS");
+  assert.equal(publicCacheStats().entries, 0);
+});

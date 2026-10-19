@@ -1,4 +1,5 @@
 import type { ApiHandler, RouteDefinition, RouteParams } from "./types";
+import { crossSiteRequestError } from "../../../src/lib/http-security";
 
 type CompiledRoute = RouteDefinition & { segments: string[] };
 
@@ -16,6 +17,8 @@ export class Router {
   }
 
   async handle(request: Request) {
+    const blocked = crossSiteRequestError(request);
+    if (blocked) return blocked;
     const url = new URL(request.url);
     const requestSegments = splitPath(url.pathname);
 

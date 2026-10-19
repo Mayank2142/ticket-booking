@@ -1,4 +1,5 @@
 import { ok } from "../../../../src/lib/api";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { db } from "../../../../src/lib/db";
 import { runMaintenanceCycle } from "../../../../src/lib/maintenance";
 import { safeError, structuredLog } from "../../../../src/lib/observability";
@@ -25,7 +26,7 @@ function cronAuthorized(request: Request, url: URL) {
   const authorization = request.headers.get("authorization");
   const bearer = authorization?.startsWith("Bearer ") ? authorization.slice(7) : null;
   const secret = request.headers.get("x-cron-secret") ?? bearer ?? url.searchParams.get("secret");
-  return Boolean(process.env.CRON_SECRET) && secret === process.env.CRON_SECRET;
+  return Boolean(process.env.CRON_SECRET) && typeof secret === "string" && timingSafeEqual(createHash("sha256").update(secret).digest(), createHash("sha256").update(process.env.CRON_SECRET!).digest());
 }
 
 async function runCleanup(request: Request, _params: Record<string, string>, url: URL) {

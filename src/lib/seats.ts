@@ -237,7 +237,7 @@ export async function confirmBooking(
         totalAmount,
         seats: { create: seatIds.map((seatId) => ({ seatId })) },
       },
-      include: { seats: { include: { seat: true } }, event: true, user: true },
+      include: { seats: { include: { seat: true } }, event: true, user: { select: { id: true, name: true, email: true } } },
     });
     await enqueueBackgroundJob({ type: JOB_TYPES.BOOKING_CONFIRMATION, payload: { id: booking.id }, dedupeKey: `${JOB_TYPES.BOOKING_CONFIRMATION}:${booking.id}` }, tx);
 

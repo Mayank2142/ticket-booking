@@ -82,7 +82,7 @@ export function AccountPage() {
     try {
       const firebaseIdToken = profile?.passwordLoginEnabled === false ? await confirmFirebaseIdentity(profile.email, profile.firebaseProvider, deletePassword) : undefined;
       await api("/api/account", { method: "DELETE", body: JSON.stringify({ password: deletePassword, firebaseIdToken }) });
-      logout();
+      await logout();
       navigate("/");
     } catch (reason) { setMessage(firebaseErrorMessage(reason)); setMessageError(true); }
     finally { setPending(null); }

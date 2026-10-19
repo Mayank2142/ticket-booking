@@ -1,6 +1,6 @@
 import type { AuthUserDto, UserRole } from "@cinebook/shared";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { api, ApiError, AUTH_UNAUTHORIZED_EVENT, clearToken, getToken, setToken } from "../lib/api";
+import { api, ApiError, AUTH_UNAUTHORIZED_EVENT, clearToken } from "../lib/api";
 import { getFirebaseConfig, signInWithVerifiedEmail } from "../lib/firebase";
 import { signInWithEmail } from "./email-sign-in";
 
@@ -16,7 +16,7 @@ type AuthContextValue = {
   loading: boolean;
   login: (email: string, password: string) => Promise<AuthUserDto>;
   register: (input: RegisterInput) => Promise<AuthUserDto>;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateSession: (token: string, user: AuthUserDto) => void;
 };
 
@@ -37,10 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    if (!getToken()) {
-      setLoading(false);
-      return () => { active = false; };
-    }
+    clearToken();
 
     api<{ user: AuthUserDto }>("/api/auth/me")
       .then(({ user: currentUser }) => { if (active) setUser(currentUser); })
@@ -59,7 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       verifiedEmailEnabled: async () => Boolean(await getFirebaseConfig()),
       invalidCredentials: (error) => error instanceof ApiError && error.status === 401,
     });
-    setToken(result.token);
     setUser(result.user);
     return result.user;
   }, []);
@@ -69,18 +65,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       method: "POST",
       body: JSON.stringify(input)
     });
-    setToken(result.token);
     setUser(result.user);
     return result.user;
   }, []);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await api("/api/auth/logout", { method: "POST" });
     clearToken();
     setUser(null);
   }, []);
 
-  const updateSession = useCallback((token: string, nextUser: AuthUserDto) => {
-    setToken(token);
+  const updateSession = useCallback((_token: string, nextUser: AuthUserDto) => {
+    clearToken();
     setUser(nextUser);
   }, []);
 

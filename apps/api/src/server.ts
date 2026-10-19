@@ -19,6 +19,9 @@ import { safeError, structuredLog } from "../../../src/lib/observability";
 import { cachedPublicResponse } from "../../../src/lib/http-cache";
 import { beginRequest, endRequest } from "../../../src/lib/runtime-metrics";
 import { firebasePublicConfig } from "../../../src/lib/firebase-auth";
+import { allowedWebOrigins, assertProductionSecurity, MAX_REQUEST_BODY_BYTES, RequestBodyError, safeRequestPath } from "../../../src/lib/http-security";
+
+assertProductionSecurity();
 
 const router = new Router()
   .addAll(authRoutes)
@@ -82,11 +85,14 @@ const server = createServer(async (incoming, outgoing) => {
   } catch (error) {
     structuredLog("error", "http.request.failed", { requestId, ...safeError(error) });
     if (!outgoing.headersSent) {
-      outgoing.statusCode = 500;
+      outgoing.statusCode = error instanceof RequestBodyError ? 413 : 500;
       outgoing.setHeader("Content-Type", "application/json; charset=utf-8");
       outgoing.setHeader("X-Request-ID", requestId);
+      outgoing.setHeader("Cache-Control", "no-store");
+      outgoing.setHeader("X-Content-Type-Options", "nosniff");
+      if (error instanceof RequestBodyError) outgoing.setHeader("Connection", "close");
     }
-    outgoing.end(JSON.stringify({ error: "Internal server error" }));
+    outgoing.end(JSON.stringify({ error: error instanceof RequestBodyError ? error.message : "Internal server error" }));
   } finally {
     endRequest();
     const durationMs = Date.now() - startedAt;
@@ -94,7 +100,7 @@ const server = createServer(async (incoming, outgoing) => {
       structuredLog(outgoing.statusCode >= 500 ? "error" : durationMs >= slowRequestMs ? "warn" : "info", "http.request", {
         requestId,
         method: incoming.method,
-        path: incoming.url,
+        path: safeRequestPath(incoming.url),
         status: outgoing.statusCode,
         durationMs,
       });
@@ -129,15 +135,28 @@ async function toWebRequest(incoming: IncomingMessage, outgoing: ServerResponse,
   return new Request(`${protocol}://${hostHeader}${incoming.url ?? "/"}`, {
     method: incoming.method ?? "GET",
     headers,
-    body,
+    body: body ? new Uint8Array(body) : undefined,
     signal: controller.signal,
   });
 }
 
 async function readBody(incoming: IncomingMessage) {
-  const chunks: Buffer[] = [];
-  for await (const chunk of incoming) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-  return chunks.length ? Buffer.concat(chunks) : undefined;
+  if (Number(firstHeader(incoming, "content-length") ?? 0) > MAX_REQUEST_BODY_BYTES) throw new RequestBodyError();
+  return new Promise<Buffer | undefined>((resolveBody, reject) => {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    incoming.on("data", (raw: Buffer | string) => {
+      const chunk = Buffer.isBuffer(raw) ? raw : Buffer.from(raw);
+      total += chunk.length;
+      if (total > MAX_REQUEST_BODY_BYTES) {
+        incoming.pause();
+        reject(new RequestBodyError());
+      } else chunks.push(chunk);
+    });
+    incoming.once("end", () => resolveBody(chunks.length ? Buffer.concat(chunks) : undefined));
+    incoming.once("error", reject);
+    incoming.once("aborted", () => reject(new Error("Request was aborted")));
+  });
 }
 
 async function sendResponse(outgoing: ServerResponse, request: Request, response: Response, requestId: string) {
@@ -161,6 +180,13 @@ async function sendResponse(outgoing: ServerResponse, request: Request, response
 }
 
 function applyCommonHeaders(outgoing: ServerResponse, request: Request, requestId: string) {
+  const vary = new Set(String(outgoing.getHeader("Vary") ?? "").split(",").map((item) => item.trim()).filter(Boolean));
+  if (new URL(request.url).pathname.startsWith("/api/")) {
+    vary.add("Cookie"); vary.add("Authorization");
+  }
+  if (new URL(request.url).pathname.startsWith("/api/") && (request.headers.has("authorization") || request.headers.has("cookie"))) {
+    outgoing.setHeader("Cache-Control", "private, no-store");
+  }
   outgoing.setHeader("X-Request-ID", requestId);
   outgoing.setHeader("X-Content-Type-Options", "nosniff");
   outgoing.setHeader("X-Frame-Options", "DENY");
@@ -176,25 +202,14 @@ function applyCommonHeaders(outgoing: ServerResponse, request: Request, requestI
     outgoing.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
   }
   const origin = request.headers.get("origin")?.replace(/\/$/, "");
-  if (origin && allowedOrigins().has(origin)) {
+  if (origin && allowedWebOrigins().has(origin)) {
     outgoing.setHeader("Access-Control-Allow-Origin", origin);
     outgoing.setHeader("Access-Control-Allow-Credentials", "true");
-    outgoing.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID");
+    outgoing.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Request-ID, X-CineBook-Session");
     outgoing.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
-    outgoing.setHeader("Vary", "Origin");
+    vary.add("Origin");
   }
-}
-
-function allowedOrigins() {
-  return new Set([
-    "http://127.0.0.1:5173",
-    "http://localhost:5173",
-    "http://127.0.0.1:4173",
-    "http://localhost:4173",
-    process.env.WEB_URL,
-    process.env.APP_URL,
-    ...(process.env.ALLOWED_ORIGINS ?? "").split(","),
-  ].filter(Boolean).map((value) => value!.trim().replace(/\/$/, "")));
+  if (vary.size) outgoing.setHeader("Vary", [...vary].join(", "));
 }
 
 async function serveStatic(pathname: string, outgoing: ServerResponse, request: Request, requestId: string) {
@@ -285,7 +300,7 @@ function contentType(path: string) {
 }
 
 function isCacheablePublicRead(request: Request, url: URL) {
-  if (request.method !== "GET" || request.headers.has("authorization")) return false;
+  if (request.method !== "GET" || request.headers.has("authorization") || request.headers.has("cookie")) return false;
   return url.pathname === "/api/events"
     || url.pathname === "/api/discovery/options"
     || url.pathname === "/api/recommendations"

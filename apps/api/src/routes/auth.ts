@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { err, ok } from "../../../../src/lib/api";
-import { getUser, hashPassword, signToken, verifyPassword } from "../../../../src/lib/auth";
+import { getUser, hashPassword, sessionCookie, verifyPassword } from "../../../../src/lib/auth";
+import { authenticatedResponse } from "../../../../src/lib/auth-response";
 import { db } from "../../../../src/lib/db";
 import { enforceRateLimit } from "../../../../src/lib/rate-limit";
 import { enqueueBackgroundJob, JOB_TYPES } from "../../../../src/lib/jobs";
@@ -17,6 +18,7 @@ import type { RouteDefinition } from "../types";
 import { readJson } from "../types";
 
 export const authRoutes: RouteDefinition[] = [
+  { method: "POST", path: "/api/auth/logout", handler: () => Response.json({ signedOut: true }, { headers: { "Set-Cookie": sessionCookie("", true), "Cache-Control": "no-store" } }) },
   { method: "GET", path: "/api/auth/providers", handler: () => ok({ firebase: firebasePublicConfig() }) },
   {
     method: "POST", path: "/api/auth/firebase",
@@ -31,7 +33,7 @@ export const authRoutes: RouteDefinition[] = [
         const principal = await verifyFirebaseIdToken(body.idToken);
         const user = await exchangeFirebaseIdentity(principal, current?.id);
         const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-        return ok({ token: signToken(authUser), user: authUser });
+        return authenticatedResponse(request, authUser);
       } catch (error) {
         return err(error instanceof FirebaseAuthError ? error.message : "Firebase sign-in could not be completed. Please try again.", error instanceof FirebaseAuthError ? error.status : 409);
       }
@@ -52,12 +54,16 @@ export const authRoutes: RouteDefinition[] = [
       } catch (error) {
         return err(error instanceof ValidationError ? error.message : "Invalid credentials", 401);
       }
-      if (typeof body.password !== "string" || !body.password) return err("Invalid credentials", 401);
+      if (typeof body.password !== "string" || !body.password || body.password.length > 128) return err("Invalid credentials", 401);
+      const accountLimited = await enforceRateLimit(request, { scope: "auth-login-account", limit: 20, windowMs: 15 * 60_000 }, email);
+      if (accountLimited) return accountLimited;
 
       const user = await db.user.findUnique({ where: { email } });
-      if (!user || !user.passwordLoginEnabled || !(await verifyPassword(body.password, user.password))) return err("Invalid credentials", 401);
+      // Missing and provider-only accounts still perform the same expensive password check.
+      const validPassword = await verifyPassword(body.password, user?.passwordLoginEnabled ? user.password : "$2b$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy");
+      if (!user || !user.passwordLoginEnabled || !validPassword) return err("Invalid credentials", 401);
       const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-      return ok({ token: signToken(authUser), user: authUser });
+      return authenticatedResponse(request, authUser);
     },
   },
   {
@@ -92,7 +98,7 @@ export const authRoutes: RouteDefinition[] = [
         return created;
       });
       const authUser = { id: user.id, email: user.email, name: user.name, role: user.role };
-      return ok({ token: signToken(authUser), user: authUser, emailVerificationQueued: true }, 201);
+      return authenticatedResponse(request, authUser, { emailVerificationQueued: true }, 201);
     },
   },
   {

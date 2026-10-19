@@ -9,6 +9,11 @@ import {
 import { eventRoutes, parseEventListQuery } from "../apps/api/src/routes/events";
 import { authRoutes } from "../apps/api/src/routes/auth";
 import { firebasePublicConfig } from "../src/lib/firebase-auth";
+import { assertProductionSecurity, crossSiteRequestError, MAX_REQUEST_BODY_BYTES, safeRequestPath } from "../src/lib/http-security";
+import { sessionCookie } from "../src/lib/auth";
+import { validatePassword } from "../src/lib/validation";
+import { safeCsvCell } from "../src/lib/csv";
+import { Router } from "../apps/api/src/router";
 
 test("web HTML does not add a second CSP that blocks configured Firebase scripts and frames", async () => {
   const html = await readFile(new URL("../apps/web/index.html", import.meta.url), "utf8");
@@ -30,6 +35,62 @@ test("Firebase configuration does not expose server credentials and missing toke
 
 test.beforeEach(() => {
   resetLocalRateLimitsForTests();
+});
+
+test("browser cookies are HttpOnly, host-only and Secure in production", () => {
+  const previous = process.env.NODE_ENV;
+  try {
+    process.env.NODE_ENV = "production";
+    const cookie = sessionCookie("session-value");
+    assert.match(cookie, /^__Host-cinebook_session=/);
+    assert.match(cookie, /HttpOnly/); assert.match(cookie, /SameSite=Strict/); assert.match(cookie, /; Secure/);
+    assert.doesNotMatch(cookie, /Domain=/i);
+    assert.match(sessionCookie("", true), /Max-Age=0/);
+  } finally { process.env.NODE_ENV = previous; }
+});
+
+test("unsafe cross-origin requests and cookie requests without the CSRF header are blocked before handlers run", async () => {
+  let called = false;
+  const router = new Router().add("POST", "/api/test", () => { called = true; return Response.json({ ok: true }); });
+  for (const headers of [{ origin: "https://attacker.example" }, { "sec-fetch-site": "cross-site" }, { cookie: "cinebook_session=secret" }] as Array<Record<string, string>>) {
+    const response = await router.handle(new Request("https://cinebook.example/api/test", { method: "POST", headers }));
+    assert.equal(response.status, 403); assert.equal(called, false);
+  }
+  const trusted = new Request("https://cinebook.example/api/test", { method: "POST", headers: { origin: "https://cinebook.example", cookie: "cinebook_session=secret", "x-cinebook-session": "cookie" } });
+  assert.equal(crossSiteRequestError(trusted), null);
+  assert.equal((await router.handle(trusted)).status, 200);
+});
+
+test("production refuses default or short signing and maintenance secrets", () => {
+  const previous = { NODE_ENV: process.env.NODE_ENV, JWT_SECRET: process.env.JWT_SECRET, CRON_SECRET: process.env.CRON_SECRET };
+  try {
+    process.env.NODE_ENV = "production";
+    process.env.JWT_SECRET = "dev-secret";
+    assert.throws(assertProductionSecurity, /JWT_SECRET/);
+    process.env.JWT_SECRET = "random-jwt-value-with-more-than-32-bytes";
+    process.env.CRON_SECRET = "short";
+    assert.throws(assertProductionSecurity, /CRON_SECRET/);
+    process.env.CRON_SECRET = "random-cron-value-with-more-than-32-bytes";
+    assert.doesNotThrow(assertProductionSecurity);
+  } finally { for (const [name, value] of Object.entries(previous)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } }
+});
+
+test("password validation prevents bcrypt's silent 72-byte truncation, including Unicode", () => {
+  assert.equal(validatePassword("a1" + "b".repeat(70)).length, 72);
+  assert.throws(() => validatePassword("a1" + "b".repeat(71)), /72 UTF-8 bytes/);
+  assert.throws(() => validatePassword("a1" + "界".repeat(24)), /72 UTF-8 bytes/);
+});
+
+test("access-log paths remove verification tokens, offer tokens and cron query credentials", () => {
+  assert.equal(safeRequestPath("/verify-email?token=private-value"), "/verify-email");
+  assert.equal(safeRequestPath("/api/cron/release-holds?secret=private-value"), "/api/cron/release-holds");
+  assert.equal(MAX_REQUEST_BODY_BYTES, 65536);
+});
+
+test("spreadsheet exports neutralise formulas while escaping quotes and preserving ordinary data", () => {
+  for (const value of ["=HYPERLINK(\"https://attacker.example\")", "+SUM(1,2)", "@SUM(A1)", "-1+2", "  =1+1", "\t=1+1", "\rpayload"]) assert.ok(safeCsvCell(value).startsWith("\"'"));
+  assert.equal(safeCsvCell('Customer "Name"'), '"Customer ""Name"""');
+  assert.equal(safeCsvCell(250), '"250"');
 });
 
 test("rate limiter rejects requests after the configured allowance", async () => {

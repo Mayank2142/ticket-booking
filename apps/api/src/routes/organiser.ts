@@ -3,6 +3,7 @@ import { err, ok } from "../../../../src/lib/api";
 import { writeAuditLog } from "../../../../src/lib/audit";
 import { getUser, requireRole } from "../../../../src/lib/auth";
 import { db } from "../../../../src/lib/db";
+import { safeCsvCell } from "../../../../src/lib/csv";
 import { validateName, ValidationError } from "../../../../src/lib/validation";
 import type { RouteDefinition } from "../types";
 import { readJson } from "../types";
@@ -225,8 +226,7 @@ async function reports(request: Request, _params: Record<string, string>, url: U
   const rows = bookings.map((booking) => ({ bookingId: booking.id, reference: booking.ref, showId: booking.eventId, showTitle: showMap.get(booking.eventId)?.title ?? "", showDate: showMap.get(booking.eventId)?.date ?? "", showTime: showMap.get(booking.eventId)?.time ?? "", customerName: booking.user.name, customerEmail: booking.user.email, seats: booking.seats.map(({ seat }) => seat.label).join(" "), total: booking.totalAmount, bookedAt: booking.createdAt.toISOString() }));
   if (csv) {
     const fields = ["reference", "showTitle", "showDate", "showTime", "customerName", "customerEmail", "seats", "total", "bookedAt"] as const;
-    const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    return new Response([fields.join(","), ...rows.map((row) => fields.map((field) => escape(row[field])).join(","))].join("\n"), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=cinebook-bookings.csv" } });
+    return new Response([fields.join(","), ...rows.map((row) => fields.map((field) => safeCsvCell(row[field])).join(","))].join("\n"), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=cinebook-bookings.csv", "Cache-Control": "private, no-store" } });
   }
   return ok({ shows, rows, totals: { bookings: rows.length, tickets: bookings.reduce((sum, booking) => sum + booking.seats.length, 0), revenue: bookings.reduce((sum, booking) => sum + booking.totalAmount, 0) } });
 }

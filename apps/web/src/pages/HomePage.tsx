@@ -176,7 +176,6 @@ export function HomePage() {
     setAlertNotice("Saving your email alert…");
     try {
       const result = await api<{ message: string }>("/api/alerts", { method: "POST", body: JSON.stringify({ email: alertEmail.trim() }) });
-      window.localStorage.setItem("cinebook-alert-email", alertEmail.trim());
       setAlertNotice(result.message);
     } catch (reason) {
       setAlertNotice(reason instanceof Error ? reason.message : "Email alert could not be saved.");

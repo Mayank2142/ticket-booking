@@ -24,7 +24,7 @@ export async function cachedPublicResponse(
   ttlMs = Number(process.env.PUBLIC_CACHE_TTL_MS ?? 5_000),
   maxEntries = Number(process.env.PUBLIC_CACHE_MAX_ENTRIES ?? 250)
 ): Promise<CacheResolution> {
-  if (ttlMs <= 0 || request.method !== "GET" || request.headers.has("authorization")) {
+  if (ttlMs <= 0 || request.method !== "GET" || request.headers.has("authorization") || request.headers.has("cookie")) {
     bypasses += 1;
     return { response: await producer(), source: "BYPASS" };
   }
