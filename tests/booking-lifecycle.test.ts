@@ -7,6 +7,7 @@ import { accountRoutes } from "../apps/api/src/routes/account";
 import { organiserRoutes } from "../apps/api/src/routes/organiser";
 import { adminRoutes } from "../apps/api/src/routes/admin";
 import { catalogueRoutes } from "../apps/api/src/routes/catalogue";
+import { eventRoutes } from "../apps/api/src/routes/events";
 import {
   cancelBooking,
   confirmBooking,
@@ -360,4 +361,44 @@ test("email alerts persist and favourites return saved event cards", async () =>
   assert.equal(favouriteResponse.status, 200);
   const payload = await favouriteResponse.json() as { events: Array<{ title: string; isFavourite: boolean }> };
   assert.deepEqual(payload.events.map((event) => ({ title: event.title, isFavourite: event.isFavourite })), [{ title: "Concurrency Test", isFavourite: true }]);
+});
+
+test("movie discovery paginates unique content and details expose every published showtime", async () => {
+  const scenario = await createScenario();
+  await db.content.update({ where: { id: scenario.content.id }, data: { type: EventType.MOVIE } });
+  await db.show.update({ where: { id: scenario.event.id }, data: { type: EventType.MOVIE } });
+  for (let day = 2; day <= 15; day++) {
+    await db.show.create({ data: {
+      organiserId: scenario.organiser.id, venueId: scenario.venue.id, auditoriumId: scenario.auditorium.id,
+      contentId: scenario.content.id, title: scenario.event.title, type: EventType.MOVIE,
+      date: `2099-01-${String(day).padStart(2, "0")}`, time: "20:00",
+      prices: { create: { categoryId: scenario.category.id, price: 500 } },
+    } });
+  }
+  const secondContent = await db.content.create({ data: { identityKey: "another-movie", title: "Another Movie", type: EventType.MOVIE, language: "English", format: "2D", genre: "Drama", durationMinutes: 120 } });
+  const secondShow = await db.show.create({ data: {
+    organiserId: scenario.organiser.id, venueId: scenario.venue.id, auditoriumId: scenario.auditorium.id,
+    contentId: secondContent.id, title: secondContent.title, type: EventType.MOVIE, date: "2099-02-01", time: "19:00",
+  } });
+  for (const status of [ShowStatus.DRAFT, ShowStatus.CANCELLED, ShowStatus.ARCHIVED]) {
+    await db.show.create({ data: {
+      organiserId: scenario.organiser.id, venueId: scenario.venue.id, auditoriumId: scenario.auditorium.id,
+      contentId: scenario.content.id, title: scenario.event.title, type: EventType.MOVIE, date: "2099-03-01", time: "19:00", status,
+    } });
+  }
+  const firstResponse = await callRoute(eventRoutes, "GET", "/api/events", "/api/events?type=MOVIE&groupMovies=true&upcoming=true&pageSize=1", "", {});
+  const first = await firstResponse.json();
+  assert.equal(first.pagination.total, 2);
+  assert.equal(first.pagination.totalPages, 2);
+  assert.equal(first.events.length, 1);
+  assert.equal(first.events[0].screeningCount, 15);
+  assert.equal(first.events[0].availableDates.length, 15);
+  const secondResponse = await callRoute(eventRoutes, "GET", "/api/events", "/api/events?type=MOVIE&groupMovies=true&upcoming=true&pageSize=1&page=2", "", {});
+  assert.equal((await secondResponse.json()).events[0].id, secondShow.id);
+  const filteredResponse = await callRoute(eventRoutes, "GET", "/api/events", "/api/events?type=MOVIE&groupMovies=true&date=2099-01-15", "", {});
+  assert.equal((await filteredResponse.json()).events[0].screeningCount, 1);
+  const detailsResponse = await callRoute(eventRoutes, "GET", "/api/events/:id", `/api/events/${scenario.event.id}`, "", { id: scenario.event.id });
+  const details = await detailsResponse.json();
+  assert.equal(details.event.showtimes.length, 15);
+  assert.equal(details.event.showtimes.at(-1).date, "2099-01-15");
 });

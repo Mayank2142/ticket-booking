@@ -2,6 +2,36 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { contentIdentityKey, toEventSummary } from "../src/lib/catalog";
 import { validateEventInput, validateVenueInput } from "../src/lib/validation";
+import { movieDateIn2030 } from "../src/lib/movie-demo-dates";
+import { groupMovieScreenings } from "@cinebook/shared";
+
+test("movie discovery groups screenings before pagination without merging live events", () => {
+  const shows = [
+    { id: "movie-a-1", contentId: "movie-a", type: "MOVIE", date: "2030-10-31" },
+    { id: "movie-a-2", contentId: "movie-a", type: "MOVIE", date: "2030-10-31" },
+    { id: "movie-a-3", contentId: "movie-a", type: "MOVIE", date: "2030-11-11" },
+    { id: "movie-b-1", contentId: "movie-b", type: "MOVIE", date: "2030-11-30" },
+    { id: "live-1", contentId: "concert", type: "CONCERT", date: "2030-11-30" },
+    { id: "live-2", contentId: "concert", type: "CONCERT", date: "2030-12-25" },
+    { id: "legacy-1", contentId: null, type: "MOVIE", date: "2030-12-25" },
+    { id: "legacy-2", contentId: null, type: "MOVIE", date: "2030-12-25" },
+  ];
+  const grouped = groupMovieScreenings(shows);
+  assert.equal(grouped.length, 6);
+  assert.deepEqual(grouped.slice(0, 2).map((item) => item.id), ["movie-a-1", "movie-b-1"]);
+  assert.equal(grouped[0].screeningCount, 3);
+  assert.deepEqual(grouped[0].availableDates, ["2030-10-31", "2030-11-11"]);
+  assert.equal(shows.length, 8);
+  assert.equal(groupMovieScreenings(shows.filter((item) => item.date === "2030-11-11"))[0].screeningCount, 1);
+});
+
+test("movie demo dates move to 2030 while preserving month and day", () => {
+  assert.equal(movieDateIn2030("2026-10-13"), "2030-10-13");
+  assert.equal(movieDateIn2030("2030-10-03"), "2030-10-03");
+  assert.equal(movieDateIn2030("2028-02-29"), "2030-02-28");
+  assert.throws(() => movieDateIn2030("2026-02-30"), /Invalid screening date/);
+  assert.throws(() => movieDateIn2030("not-a-date"), /Invalid screening date/);
+});
 
 test("content identity groups equivalent show listings", () => {
   const first = contentIdentityKey({ title: "  Midnight Premiere ", type: "MOVIE", language: "Hindi", format: "2D" });

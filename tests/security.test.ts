@@ -77,6 +77,7 @@ test("event listing rejects invalid pagination and filter query values", async (
     "type=SPORT",
     "date=2030-02-31",
     "upcoming=sometimes",
+    "groupMovies=yes",
     `q=${"x".repeat(101)}`,
   ];
   for (const query of invalidQueries) {

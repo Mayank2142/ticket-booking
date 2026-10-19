@@ -35,6 +35,7 @@ export function CataloguePage({ type }: { type?: EventType }) {
     const params = new URLSearchParams(searchParams);
     if (type) params.set("type", type); else params.delete("type");
     params.set("upcoming", "true");
+    if (type !== "CONCERT") params.set("groupMovies", "true");
     params.set("pageSize", "8");
     setLoading(true);
     setError("");

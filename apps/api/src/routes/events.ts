@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { groupMovieScreenings } from "@cinebook/shared";
 import { BookingStatus, EventType, Prisma, Role, SeatStatus, ShowStatus, WaitlistStatus } from "../../../../src/generated/prisma/client";
 import { err, ok } from "../../../../src/lib/api";
 import { getUser, requireRole } from "../../../../src/lib/auth";
@@ -28,7 +29,7 @@ async function listEvents(request: Request, _params: Record<string, string>, url
   } catch (error) {
     return err(error instanceof ValidationError ? error.message : "Invalid discovery query");
   }
-  const { type, q, city, language, format, genre, venueId, date, mine, upcoming, sort, page, pageSize } = query;
+  const { type, q, city, language, format, genre, venueId, date, mine, upcoming, groupMovies, sort, page, pageSize } = query;
   const today = new Date().toISOString().slice(0, 10);
   const recentSince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
@@ -69,6 +70,42 @@ async function listEvents(request: Request, _params: Record<string, string>, url
     },
   } satisfies Prisma.ShowInclude;
 
+  const favourites = user?.role === Role.CUSTOMER
+    ? await db.favourite.findMany({ where: { userId: user.id }, select: { contentId: true } })
+    : [];
+  const favouriteIds = new Set(favourites.map((item) => item.contentId));
+
+  if (groupMovies && !mine) {
+    // Rank lightweight screening records, group, then paginate movie posters.
+    // Only selected representatives load full content/venue/category relations.
+    const candidates = await db.show.findMany({
+      where,
+      select: {
+        id: true, contentId: true, type: true, date: true, time: true,
+        prices: { select: { price: true } },
+        _count: { select: { bookings: { where: { status: BookingStatus.CONFIRMED, createdAt: { gte: recentSince } } } } },
+      },
+      orderBy: [{ date: "asc" }, { time: "asc" }, { id: "asc" }],
+    });
+    candidates.sort((left, right) => {
+      if (sort === "price-asc") return startingPrice(left.prices) - startingPrice(right.prices);
+      if (sort === "price-desc") return startingPrice(right.prices) - startingPrice(left.prices);
+      if (sort === "trending") return right._count.bookings - left._count.bookings || left.date.localeCompare(right.date);
+      return left.date.localeCompare(right.date) || left.time.localeCompare(right.time);
+    });
+    const grouped = groupMovieScreenings(candidates);
+    const selectedGroups = grouped.slice((page - 1) * pageSize, page * pageSize);
+    const representatives = await db.show.findMany({ where: { id: { in: selectedGroups.map((item) => item.id) } }, include });
+    const byId = new Map(representatives.map((item) => [item.id, item]));
+    return ok({
+      events: selectedGroups.flatMap((group) => {
+        const event = byId.get(group.id);
+        return event ? [{ ...toEventSummary(event, favouriteIds), trendingScore: event._count.bookings, screeningCount: group.screeningCount, availableDates: group.availableDates }] : [];
+      }),
+      pagination: { page, pageSize, total: grouped.length, totalPages: Math.max(1, Math.ceil(grouped.length / pageSize)) },
+    });
+  }
+
   const requiresRankedWindow = sort !== "date";
   const [total, rows] = await Promise.all([
     db.show.count({ where }),
@@ -89,10 +126,6 @@ async function listEvents(request: Request, _params: Record<string, string>, url
   });
   const events = requiresRankedWindow ? ranked.slice((page - 1) * pageSize, page * pageSize) : ranked;
 
-  const favourites = user?.role === Role.CUSTOMER
-    ? await db.favourite.findMany({ where: { userId: user.id }, select: { contentId: true } })
-    : [];
-  const favouriteIds = new Set(favourites.map((item) => item.contentId));
   return ok({
     events: events.map((event) => ({ ...toEventSummary(event, favouriteIds), trendingScore: event._count.bookings })),
     pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
@@ -148,6 +181,7 @@ export function parseEventListQuery(url: URL) {
     date: dateParam(url, "date"),
     mine: booleanParam(url, "mine"),
     upcoming: booleanParam(url, "upcoming"),
+    groupMovies: booleanParam(url, "groupMovies"),
     sort: enumParam(url, "sort", ["date", "price-asc", "price-desc", "trending"]) ?? "date",
     page: integerParam(url, "page", 1, 10_000, 1),
     pageSize: integerParam(url, "pageSize", 1, 48, 12),
@@ -266,10 +300,9 @@ async function getEvent(request: Request, params: Record<string, string>) {
       : null,
     event.contentId
       ? db.show.findMany({
-          where: { contentId: event.contentId, date: { gte: new Date().toISOString().slice(0, 10) } },
+          where: { contentId: event.contentId, status: ShowStatus.PUBLISHED, venue: { archivedAt: null }, date: { gte: new Date().toISOString().slice(0, 10) } },
           include: { venue: true, prices: true },
           orderBy: [{ date: "asc" }, { time: "asc" }],
-          take: 12,
         })
       : [],
   ]);

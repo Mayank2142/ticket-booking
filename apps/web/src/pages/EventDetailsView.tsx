@@ -19,12 +19,13 @@ type Props = {
 
 /** A presentation layer only; EventPage continues to own API, favourite and booking state. */
 export function EventDetailsView({ event, availableSeats, realtimeStatus, canFavourite, notice, onSelectSeats, onFavourite }: Props) {
+  const dates = [...new Set(event.showtimes.map((show) => show.date))].sort();
+  const selectedDate = dates.includes(event.date) ? event.date : dates[0];
   const venues = new Map<string, EventDetailDto["showtimes"]>();
-  for (const show of event.showtimes) {
+  for (const show of event.showtimes.filter((show) => show.date === selectedDate)) {
     const key = JSON.stringify([show.venue.name, show.venue.city]);
     venues.set(key, [...(venues.get(key) ?? []), show]);
   }
-  const dates = [...new Set(event.showtimes.map((show) => show.date))];
   const formats = [...new Set([event.format, ...event.formats].filter(Boolean))];
   return <div className="details-design">
     <div className="details-design__ribbon" aria-label="Current show availability"><span>{realtimeStatus === "live" ? "Live seating connected" : realtimeStatus === "connecting" ? "Connecting live seating…" : "Reconnecting · safety refresh active"}</span><span>{availableSeats} seats currently available</span><span>{event.venue.city}</span></div>
@@ -50,6 +51,7 @@ export function EventDetailsView({ event, availableSeats, realtimeStatus, canFav
     <section id="details-showtimes" className="details-design__showtimes" aria-labelledby="details-showtimes-title">
       <header><div><p className="details-design__eyebrow">Select showtimes</p><h2 id="details-showtimes-title">Venues & show timings</h2></div><span>{event.showtimes.length} upcoming show{event.showtimes.length === 1 ? "" : "s"}</span></header>
       {dates.length > 0 && <nav className="details-design__dates" aria-label="Show dates">{dates.map((date) => <Link key={date} to={`/events/${event.showtimes.find((show) => show.date === date)!.id}`} aria-current={date === event.date ? "date" : undefined}><small>{new Intl.DateTimeFormat("en-IN", { weekday: "short" }).format(new Date(`${date}T00:00:00`))}</small><strong>{formatEventDate(date)}</strong></Link>)}</nav>}
+      {selectedDate && <p className="details-design__date-summary" role="status">Available times for {formatEventDate(selectedDate)}. Choose a time, then select your seats.</p>}
       <div className="details-design__formats" aria-label="Content formats">{formats.map((format) => <Badge key={format} tone={format === event.format ? "primary" : "neutral"}>{format}</Badge>)}</div>
       {event.showtimes.length ? <div className="details-design__venues">{[...venues].map(([key, shows]) => <Card as="article" className="details-design__venue" key={key}><header><div><h3>{shows[0].venue.name}</h3><p>{shows[0].venue.city}</p></div><Badge>Showtimes</Badge></header><div className="details-design__times">{shows.map((show) => <Link className={show.id === event.id ? "is-current" : ""} aria-current={show.id === event.id ? "page" : undefined} key={show.id} to={`/events/${show.id}`} aria-label={`${show.time}, ${formatEventDate(show.date)}, ${show.venue.name}, ${show.venue.auditorium}, from ₹${show.startingPrice}`}><strong>{show.time}</strong><span>{show.venue.auditorium}</span><small>{formatEventDate(show.date)}</small><b>From ₹{show.startingPrice}</b></Link>)}</div></Card>)}</div> : <Card className="details-design__empty" role="status"><h3>No additional upcoming showtimes</h3><p>No upcoming shows are listed for this content. The selected show’s details are below.</p></Card>}
     </section>

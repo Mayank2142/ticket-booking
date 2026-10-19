@@ -90,6 +90,8 @@ export type EventSummaryDto = {
   entryRule?: string | null;
   status: ShowStatus;
   trendingScore?: number;
+  screeningCount?: number;
+  availableDates?: string[];
   isFavourite: boolean;
   date: string;
   time: string;
@@ -110,6 +112,22 @@ export type PaginatedEventsDto = {
   events: EventSummaryDto[];
   pagination: { page: number; pageSize: number; total: number; totalPages: number };
 };
+
+/** Input order determines the representative show; non-movie events stay separate. */
+export function groupMovieScreenings<T extends { id: string; type: string; contentId?: string | null; date: string }>(shows: readonly T[]) {
+  const groups = new Map<string, T & { screeningCount: number; availableDates: string[] }>();
+  for (const show of shows) {
+    const key = show.type === "MOVIE" && show.contentId ? `movie:${show.contentId}` : `show:${show.id}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.screeningCount += 1;
+      if (!existing.availableDates.includes(show.date)) existing.availableDates.push(show.date);
+    } else {
+      groups.set(key, { ...show, screeningCount: 1, availableDates: [show.date] });
+    }
+  }
+  return [...groups.values()].map((group) => ({ ...group, availableDates: group.availableDates.sort() }));
+}
 
 export type EventDetailDto = Omit<EventSummaryDto, "venue" | "prices"> & {
   venue: {

@@ -1,4 +1,4 @@
-import type { EventSummaryDto } from "@cinebook/shared";
+import type { DiscoveryOptionsDto, EventSummaryDto } from "@cinebook/shared";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -16,6 +16,7 @@ export function HomePage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [events, setEvents] = useState<EventSummaryDto[]>([]);
+  const [discoveryOptions, setDiscoveryOptions] = useState<DiscoveryOptionsDto>({ cities: [], genres: [], venues: [], languages: [], formats: [] });
   const [trending, setTrending] = useState<EventSummaryDto[]>([]);
   const [recommendations, setRecommendations] = useState<EventSummaryDto[]>([]);
   const [recentlyViewed, setRecentlyViewed] = useState<EventSummaryDto[]>([]);
@@ -31,7 +32,14 @@ export function HomePage() {
 
   useEffect(() => {
     const controller = new AbortController();
-    api<{ events: EventSummaryDto[] }>("/api/events?pageSize=48", { signal: controller.signal })
+    const params = new URLSearchParams(searchParams);
+    params.delete("page");
+    params.set("pageSize", "48");
+    params.set("upcoming", "true");
+    params.set("groupMovies", "true");
+    setLoading(true);
+    setError("");
+    api<{ events: EventSummaryDto[] }>(`/api/events?${params}`, { signal: controller.signal })
       .then((catalogue) => setEvents(catalogue.events))
       .catch((reason: unknown) => {
         if (reason instanceof DOMException && reason.name === "AbortError") return;
@@ -39,12 +47,16 @@ export function HomePage() {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [user?.id]);
+  }, [user?.id, searchParams]);
+
+  useEffect(() => {
+    api<DiscoveryOptionsDto>("/api/discovery/options").then(setDiscoveryOptions).catch(() => null);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
     Promise.all([
-      api<{ events: EventSummaryDto[] }>("/api/events?upcoming=true&sort=trending&pageSize=4", { signal: controller.signal }).then((result) => setTrending(result.events)),
+      api<{ events: EventSummaryDto[] }>("/api/events?upcoming=true&groupMovies=true&sort=trending&pageSize=4", { signal: controller.signal }).then((result) => setTrending(result.events)),
       api<{ recommendations: EventSummaryDto[] }>("/api/recommendations", { signal: controller.signal }).then((result) => setRecommendations(result.recommendations)),
       user?.role === "CUSTOMER" ? api<{ events: EventSummaryDto[] }>("/api/recently-viewed", { signal: controller.signal }).then((result) => setRecentlyViewed(result.events)) : Promise.resolve(),
     ]).catch(() => null);
@@ -59,15 +71,15 @@ export function HomePage() {
     setFormat(searchParams.get("format") || "ALL");
   }, [searchParams]);
 
-  const cities = useMemo(() => Array.from(new Set(events.map((event) => event.venue.city))).sort(), [events]);
-  const languages = useMemo(() => Array.from(new Set(events.map((event) => event.language))).sort(), [events]);
+  const cities = discoveryOptions.cities;
+  const languages = discoveryOptions.languages;
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return events.filter((event) => {
       const matchesCity = city === "ALL" || event.venue.city === city;
       const matchesLanguage = language === "ALL" || event.language === language;
       const matchesFormat = format === "ALL" || event.format.toLowerCase().includes(format.toLowerCase());
-      const matchesDate = !date || event.date === date;
+      const matchesDate = !date || event.date === date || Boolean(event.availableDates?.includes(date));
       const matchesQuery = !normalizedQuery || `${event.title} ${event.venue.name} ${event.genre}`.toLowerCase().includes(normalizedQuery);
       return matchesCity && matchesLanguage && matchesFormat && matchesDate && matchesQuery;
     });
@@ -214,7 +226,7 @@ function HomeEventCard({ event, onFavourite }: { event: EventSummaryDto; onFavou
   const minutes = event.durationMinutes % 60;
   return <Card as="article" className="home-event-card">
     <div className="home-event-card__poster"><Link to={`/events/${event.id}`} aria-label={`View ${event.title}`}><PosterImage src={event.posterUrl || (event.type === "MOVIE" ? "/images/portal-poster.png" : "/images/cinema-hero.png")} alt="" /><Badge className="home-format-badge">{event.format}</Badge></Link>{onFavourite && <FavouriteButton event={event} onFavourite={onFavourite} />}</div>
-    <div className="home-event-card__body"><div className="home-event-card__schedule"><HomeIcon name="calendar" /><span>{formatEventDate(event.date)} · {event.time}</span></div><h3><Link to={`/events/${event.id}`}>{event.title}</Link></h3><p>{event.genre} · {hours}h {minutes ? `${minutes}m · ` : "· "}{event.language}</p><div className="home-event-card__venue"><span>{event.venue.name}</span>{event.certificate && <Badge>{event.certificate}</Badge>}</div><div className="home-event-card__footer"><span><small>Starting from</small><strong>₹{getStartingPrice(event.prices).toLocaleString("en-IN")}</strong></span><ButtonLink to={`/events/${event.id}`} size="small">Book now</ButtonLink></div></div>
+    <div className="home-event-card__body"><div className="home-event-card__schedule"><HomeIcon name="calendar" /><span>{event.type === "MOVIE" && (event.screeningCount ?? 0) > 1 ? `${event.availableDates?.length ?? 1} dates · ${event.screeningCount} shows` : `${formatEventDate(event.date)} · ${event.time}`}</span></div><h3><Link to={`/events/${event.id}`}>{event.title}</Link></h3><p>{event.genre} · {hours}h {minutes ? `${minutes}m · ` : "· "}{event.language}</p><div className="home-event-card__venue"><span>{event.venue.name}</span>{event.certificate && <Badge>{event.certificate}</Badge>}</div><div className="home-event-card__footer"><span><small>Starting from</small><strong>₹{getStartingPrice(event.prices).toLocaleString("en-IN")}</strong></span><ButtonLink to={`/events/${event.id}`} size="small">{event.type === "MOVIE" ? "Dates & times" : "Book now"}</ButtonLink></div></div>
   </Card>;
 }
 

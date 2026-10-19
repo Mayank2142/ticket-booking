@@ -26,6 +26,8 @@ The deployed demo includes sample movies/events and demo accounts. It is not a r
 
 The frontend shares light/dark tokens and reusable components. Movies and Live Events share the same discovery layout. Checkout confirms reservations: no real payment gateway, ticket transfer or mobile-wallet integration is provided.
 
+Explore and Movies show one poster per movie, with screenings grouped before pagination. Open a movie to browse every published upcoming date and the venue/showtimes for the selected date; each screening retains independent seats and prices. Existing per-show API clients remain supported; grouped discovery opts in with `groupMovies=true`.
+
 ## Product preview
 
 The gallery contains ten committed screenshots across both themes and all three roles. Local demo posters and artwork are in `public/images`. Titles, venues and screenings are sample content—not real cinema inventory. Check artwork rights before public use.
@@ -149,6 +151,8 @@ npm run dev
 Open **[http://localhost:5173](http://localhost:5173)**. Keep this terminal running: it starts React/Vite on **5173** and the API on **3000**.
 
 Use `db:seed` for the initial **demo database**, not a live database with customer bookings. `demo:movies` adds future screenings for seeded Interstellar, Kalki 2898 AD, Dune: Part Two and Oppenheimer when older screenings have passed. It leaves historical bookings and existing seat locks unchanged.
+
+Movie demo screenings now use **2030**. To move existing movie shows to 2030, preview with `npm run demo:movies:2030`, then save with `npm run demo:movies:2030 -- --apply`. This changes only movie show dates, preserving month/day (February 29 becomes February 28), times, IDs and booking relationships. It does not change concerts. Run it separately against each intended database; do not rerun the seed to reschedule shows.
 
 ### 4. Start background work
 

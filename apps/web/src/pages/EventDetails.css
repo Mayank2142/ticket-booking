@@ -44,6 +44,7 @@
 .details-design__dates small { text-transform: uppercase; color: var(--color-text-muted); font-size: 10px; }
 .details-design__dates a[aria-current] { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 .details-design__dates a[aria-current] small { color: #fff; }
+.details-design__date-summary { color: var(--color-text-muted); margin: 0 0 16px; font-size: 14px; }
 .details-design__formats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
 .details-design__venues { display: grid; gap: 24px; }
 .details-design__venue > header { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--color-surface-low); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; }

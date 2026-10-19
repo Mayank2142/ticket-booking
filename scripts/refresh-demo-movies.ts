@@ -1,4 +1,5 @@
 import { db } from "../src/lib/db";
+import { movieDateIn2030 } from "../src/lib/movie-demo-dates";
 
 // Add upcoming local demo screenings without rescheduling historical bookings.
 const demoVenueIds = ["seed-pvr-vegas", "seed-forum-koramangala", "seed-inox-meenakshi", "seed-cinepolis-nexus"];
@@ -18,14 +19,14 @@ async function main() {
     if (seen.has(key)) continue;
     seen.add(key);
     const result = await db.$transaction(async (tx) => {
-      const existing = await tx.show.findFirst({ where: { contentId: template.contentId, venueId: template.venueId, status: "PUBLISHED", date: { gte: today } } });
+      const existing = await tx.show.findFirst({ where: { contentId: template.contentId, venueId: template.venueId, status: "PUBLISHED", date: { gte: "2030-01-01", lt: "2031-01-01" } } });
       if (existing) return { title: existing.title, date: existing.date, created: false };
       if (!template.prices.length) throw new Error(`No category prices for ${template.title}. Run the initial seed first.`);
       const seats = await tx.seat.findMany({ where: { venueId: template.venueId } });
       if (!seats.length) throw new Error(`No layout for ${template.title}. Run the initial seed first.`);
       const screeningDate = new Date(`${today}T12:00:00Z`);
       screeningDate.setUTCDate(screeningDate.getUTCDate() + 7);
-      const date = screeningDate.toISOString().slice(0, 10);
+      const date = movieDateIn2030(screeningDate.toISOString().slice(0, 10));
       const show = await tx.show.create({ data: {
         title: template.title, type: "MOVIE", description: template.description,
         contentId: template.contentId, venueId: template.venueId, auditoriumId: template.auditoriumId,
