@@ -66,7 +66,8 @@ html[data-theme="light"] .home-page {
 .home-feature__image--diljit > img { height: 134.78%; top: -11.59%; }
 .home-feature__image > img.image-fallback { width: 100%; height: 100%; inset: 0; }
 .home-page .home-feature__art-label { position: absolute; top: 16px; right: 16px; color: #f8fafc; background: rgba(15, 23, 42, .82); }
-.home-page .home-feature__arrow { position: absolute; z-index: 2; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; color: var(--color-text-strong); border-color: var(--color-border-strong); background: var(--color-surface); box-shadow: var(--shadow-card); }
+/* Centre without transforms: shared button hover styles must not move the arrows. */
+.home-page .home-feature__arrow { position: absolute; z-index: 2; top: calc(50% - 22px); transform: none; width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; color: var(--color-text-strong); border-color: var(--color-border-strong); background: var(--color-surface); box-shadow: var(--shadow-card); }
 .home-feature__arrow--previous { left: 12px; }
 .home-feature__arrow--next { right: 12px; }
 .home-page .home-feature__arrow:hover { color: var(--home-purple-text); border-color: var(--color-primary); }
@@ -231,7 +232,7 @@ html[data-theme="light"] .home-page :is(.ui-input, .ui-select) { color-scheme: l
   .home-feature__art { grid-row: 1; height: 260px; min-height: 0; }
   .home-feature__art { padding: 12px 56px; }
   .home-feature__image { max-width: calc(236px * var(--art-ratio)); }
-  .home-page .home-feature__arrow { top: 130px; }
+  .home-page .home-feature__arrow { top: 108px; }
   .home-feature__content { padding: 20px; }
   .home-feature__badges { gap: 6px; margin-bottom: 12px; }
   .home-feature__description { font-size: 14px; }
