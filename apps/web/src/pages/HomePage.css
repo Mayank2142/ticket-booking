@@ -36,12 +36,13 @@ html[data-theme="light"] .home-page {
 .home-page .home-eyebrow--info { color: var(--home-info-text); }
 
 /* Featured experience: card content on the left, cinematic artwork on the right. */
-.home-feature { display: grid; grid-template-columns: 1.4fr 1fr; min-height: 460px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
-.home-feature__content { padding: 32px; display: flex; flex-direction: column; min-width: 0; }
+.home-feature { position: relative; display: grid; grid-template-columns: 1.4fr 1fr; min-height: 480px; overflow: hidden; border: 1px solid var(--color-border); border-radius: var(--radius-lg); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.home-feature__content { padding: 32px 32px 32px 72px; display: flex; flex-direction: column; min-width: 0; }
+.home-feature:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 4px; }
 .home-feature__badges { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
 .home-feature__language { color: var(--color-text-muted); font-size: 12px; }
-.home-page .home-feature h1 { margin-bottom: 12px; color: var(--color-text-strong); font-size: var(--text-display-lg); line-height: var(--text-display-lg-line); }
-.home-feature__description { max-width: 580px; color: var(--color-text-muted); font-size: 16px; line-height: 1.6; }
+.home-page .home-feature h1 { margin-bottom: 12px; color: var(--color-text-strong); font-size: var(--text-display-lg); line-height: var(--text-display-lg-line); overflow-wrap: anywhere; }
+.home-feature__description { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; max-width: 580px; color: var(--color-text-muted); font-size: 16px; line-height: 1.6; }
 .home-feature__shows { margin: 20px 0 24px; }
 .home-feature__shows > p { margin-bottom: 8px; color: var(--color-text-subtle); font-size: 12px; }
 .home-feature__shows > div { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -51,9 +52,25 @@ html[data-theme="light"] .home-page {
 .home-feature__actions { margin-top: auto; padding-top: 20px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--color-border); }
 .home-feature__assurance { display: inline-flex; align-items: center; gap: 6px; color: var(--color-text-muted); font-size: 11px; }
 .home-feature__assurance svg { width: 16px; height: 16px; color: var(--home-info-text); }
-.home-feature__art { position: relative; min-width: 0; min-height: 100%; background: #11131c; }
-.home-feature__art > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; object-position: center; }
+.home-feature__art { position: relative; min-width: 0; min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px 64px 24px 24px; background: var(--color-surface-low); }
+.home-feature__image { --art-ratio: 1.6; width: 100%; max-width: calc(360px * var(--art-ratio)); aspect-ratio: var(--art-ratio); position: relative; overflow: hidden; border-radius: var(--radius-sm); }
+.home-feature__image > img { position: absolute; width: 100%; height: 100%; inset: 0; object-fit: cover; }
+.home-feature__image--poster:has(img[src*="kalki-2898-ad"]) { --art-ratio: .5586; }
+.home-feature__image--oppenheimer { --art-ratio: 1.905; }
+.home-feature__image--oppenheimer > img { width: 127.36%; height: 135.55%; left: -13.68%; top: -17.06%; }
+.home-feature__image--interstellar { --art-ratio: .8543; }
+.home-feature__image--interstellar > img { width: 110.85%; height: 169.54%; left: -5.43%; top: -15.23%; }
+.home-feature__image--coldplay { --art-ratio: 2.5; }
+.home-feature__image--coldplay > img { width: 140.27%; height: 191.1%; left: -39.73%; top: -36.99%; }
+.home-feature__image--diljit { --art-ratio: 2.4734; }
+.home-feature__image--diljit > img { height: 134.78%; top: -11.59%; }
+.home-feature__image > img.image-fallback { width: 100%; height: 100%; inset: 0; }
 .home-page .home-feature__art-label { position: absolute; top: 16px; right: 16px; color: #f8fafc; background: rgba(15, 23, 42, .82); }
+.home-page .home-feature__arrow { position: absolute; z-index: 2; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; min-width: 44px; min-height: 44px; padding: 0; border-radius: 50%; color: var(--color-text-strong); border-color: var(--color-border-strong); background: var(--color-surface); box-shadow: var(--shadow-card); }
+.home-feature__arrow--previous { left: 12px; }
+.home-feature__arrow--next { right: 12px; }
+.home-page .home-feature__arrow:hover { color: var(--home-purple-text); border-color: var(--color-primary); }
+.home-feature__position { position: absolute; bottom: 16px; right: 16px; padding: 5px 10px; color: var(--color-text); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-pill, 999px); font-size: 12px; font-variant-numeric: tabular-nums; }
 
 /* The quick links use only the entertainment types already supported. */
 .home-categories { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 24px 0 16px; }
@@ -184,7 +201,7 @@ html[data-theme="light"] .home-page :is(.ui-input, .ui-select) { color-scheme: l
 
 @media (max-width: 1023px) {
   .home-feature { grid-template-columns: 1.1fr 1fr; min-height: 420px; }
-  .home-feature__content { padding: 24px; }
+  .home-feature__content { padding: 24px 24px 24px 64px; }
   .home-feature__assurance { width: 100%; }
   .home-feature__description { font-size: 14px; }
   .home-categories { gap: 8px; }
@@ -211,7 +228,10 @@ html[data-theme="light"] .home-page :is(.ui-input, .ui-select) { color-scheme: l
 @media (max-width: 767px) {
   .home-page { padding-top: 16px; }
   .home-feature { grid-template-columns: 1fr; min-height: 0; }
-  .home-feature__art { grid-row: 1; height: 200px; min-height: 0; }
+  .home-feature__art { grid-row: 1; height: 260px; min-height: 0; }
+  .home-feature__art { padding: 12px 56px; }
+  .home-feature__image { max-width: calc(236px * var(--art-ratio)); }
+  .home-page .home-feature__arrow { top: 130px; }
   .home-feature__content { padding: 20px; }
   .home-feature__badges { gap: 6px; margin-bottom: 12px; }
   .home-feature__description { font-size: 14px; }

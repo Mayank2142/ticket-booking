@@ -4,6 +4,31 @@ import { contentIdentityKey, toEventSummary } from "../src/lib/catalog";
 import { validateEventInput, validateVenueInput } from "../src/lib/validation";
 import { movieDateIn2030 } from "../src/lib/movie-demo-dates";
 import { groupMovieScreenings } from "@cinebook/shared";
+import { featuredShows, nextFeaturedIndex } from "../apps/web/src/lib/featured-shows";
+
+test("featured carousel includes unique published movies and live events, not duplicate dates", () => {
+  const events = [
+    { id: "live-1", contentId: "live", title: "Coldplay: Music of the Spheres", type: "CONCERT" as const, status: "PUBLISHED" as const },
+    { id: "dune-1", contentId: "dune", title: "Dune: Part Two", type: "MOVIE" as const, status: "PUBLISHED" as const },
+    { id: "dune-2", contentId: "dune", title: "Dune: Part Two", type: "MOVIE" as const, status: "PUBLISHED" as const },
+    { id: "live-2", contentId: "live", title: "Coldplay: Music of the Spheres", type: "CONCERT" as const, status: "PUBLISHED" as const },
+    { id: "hidden", title: "Private premiere", type: "MOVIE" as const, status: "DRAFT" as const },
+    { id: "legacy-1", title: "Legacy movie", type: "MOVIE" as const, status: "PUBLISHED" as const },
+    { id: "legacy-2", title: " Legacy  movie ", type: "MOVIE" as const, status: "PUBLISHED" as const },
+  ];
+  assert.deepEqual(featuredShows(events).map((event) => event.id), ["dune-1", "live-1", "legacy-1"]);
+  assert.equal(events[0].id, "live-1");
+  assert.deepEqual(featuredShows([]), []);
+  assert.deepEqual(featuredShows(events.filter((event) => event.type === "CONCERT")).map((event) => event.id), ["live-1"]);
+});
+
+test("featured carousel arrows wrap in both directions and tolerate zero or one slide", () => {
+  assert.equal(nextFeaturedIndex(0, -1, 7), 6);
+  assert.equal(nextFeaturedIndex(6, 1, 7), 0);
+  assert.equal(nextFeaturedIndex(2, 1, 7), 3);
+  assert.equal(nextFeaturedIndex(0, 1, 1), 0);
+  assert.equal(nextFeaturedIndex(0, -1, 0), 0);
+});
 
 test("movie discovery groups screenings before pagination without merging live events", () => {
   const shows = [

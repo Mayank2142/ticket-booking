@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { PosterImage } from "../components/PosterImage";
+import { FeaturedCarousel } from "../components/FeaturedCarousel";
 import { Badge, Button, ButtonLink, Card, Input, MapPinIcon, Select } from "../components/ui";
 import { api } from "../lib/api";
 import { formatEventDate, getStartingPrice } from "../lib/presentation";
@@ -93,24 +94,7 @@ export function HomePage() {
 
   return (
     <div className="home-page">
-      <section className="home-feature" aria-labelledby="hero-title">
-        <div className="home-feature__content">
-          <div className="home-feature__badges">
-            <Badge tone="primary">Featured movie</Badge>
-            {dune && <><Badge className="home-format-badge">{dune.format}</Badge>{dune.certificate && <Badge>{dune.certificate}</Badge>}<span className="home-feature__language">{dune.language}</span></>}
-          </div>
-          <p className="home-eyebrow">{dune ? "Now in theatres · Premium cinema" : "Movies & live entertainment"}</p>
-          <h1 id="hero-title">{dune?.title ?? "Book your moment."}</h1>
-          <p className="home-feature__description">{dune?.description || "Discover movies and live entertainment. Choose exact seats from a map that updates in real time."}</p>
-          {dune && <div className="home-feature__shows"><p>Scheduled shows{city !== "ALL" ? ` in ${city}` : " across our venues"}</p><div>{events.filter((event) => event.title === dune.title && (city === "ALL" || event.venue.city === city)).slice(0, 3).map((show) => <Link to={`/events/${show.id}`} key={show.id}>{show.time} <span>({show.venue.name})</span></Link>)}</div></div>}
-          <div className="home-feature__actions">
-            {dune ? <ButtonLink to={`/events/${dune.id}`} aria-label={`View ${dune.title}`}>Book tickets · From ₹{getStartingPrice(dune.prices).toLocaleString("en-IN")} <span aria-hidden="true">→</span></ButtonLink> : <ButtonLink to="/movies">Explore movies →</ButtonLink>}
-            <ButtonLink variant="secondary" to="/movies">Explore movies</ButtonLink>
-            <span className="home-feature__assurance"><HomeIcon name="shield" /> Secure seat holds</span>
-          </div>
-        </div>
-        <div className="home-feature__art"><PosterImage src={dune?.title === "Dune: Part Two" ? "/images/stitch/hero-dune.jpg" : dune?.posterUrl || "/images/stitch/hero-dune.jpg"} alt="" loading="eager" /><Badge className="home-feature__art-label">{dune?.format ?? "Your next show"}</Badge></div>
-      </section>
+      <FeaturedCarousel events={filtered} city={city} />
 
       <nav className="home-categories" aria-label="Browse entertainment">
         <Link to="/movies"><span className="home-category-icon"><HomeIcon name="film" /></span><span><strong>Movies</strong><small>Now in theatres</small></span><span aria-hidden="true">→</span></Link>
